@@ -16,6 +16,7 @@ It supports three environments:
 - **Production**
 
 ### Core Technologies
+
 | Purpose | Tool / Service |
 |----------|----------------|
 | Infrastructure as Code | Terraform |
@@ -33,7 +34,7 @@ It supports three environments:
 
 ## 🧱 Directory Structure
 
-```
+```bash
 infra/
 ├── terraform/
 │   ├── modules/
@@ -92,7 +93,8 @@ make helm-deploy ENV=dev
 ```
 
 Helm uses environment-specific values files located in:
-```
+
+```bash
 infra/k8s/helm/eshop-app/values-{env}.yaml
 ```
 
