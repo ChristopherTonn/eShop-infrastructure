@@ -2,7 +2,7 @@ name: 🔨 Continuous Integration
 
 on:
   push:
-    branches: [develop, staging, main]
+    branches: [develop, staging, main, feature/ci-cd-implementation]
   pull_request:
     branches: [develop, staging, main]
 
