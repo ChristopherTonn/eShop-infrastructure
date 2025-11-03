@@ -138,12 +138,12 @@ jobs:
             ${{ runner.os }}-nuget-
 
       - name: 🔄 Restore Solution
-        run: dotnet restore eShop.slnx
+        run: dotnet restore eShop.Web.slnf
         env:
           NUGET_PACKAGES: ${{ runner.temp }}/nuget-cache
 
       - name: 🏗️ Build Solution
-        run: dotnet build eShop.slnx --no-restore --configuration ${{ env.DOTNET_CONFIGURATION }}
+        run: dotnet build eShop.Web.slnf --no-restore --configuration ${{ env.DOTNET_CONFIGURATION }}
 
       - name: 📦 Publish Applications
         run: |
