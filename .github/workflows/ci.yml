@@ -54,12 +54,12 @@ jobs:
             ${{ runner.os }}-nuget-
 
       - name: 🔄 Restore Dependencies
-        run: dotnet restore ${{ matrix.service }}/${{ matrix.service }}.csproj
+        run: dotnet restore src/${{ matrix.service }}/${{ matrix.service }}.csproj
         env:
           NUGET_PACKAGES: ~/.nuget/packages
 
       - name: 🏗️ Build Service
-        run: dotnet build ${{ matrix.service }}/${{ matrix.service }}.csproj --no-restore --configuration ${{ env.DOTNET_CONFIGURATION }}
+        run: dotnet build src/${{ matrix.service }}/${{ matrix.service }}.csproj --no-restore --configuration ${{ env.DOTNET_CONFIGURATION }}
 
       - name: 🧪 Run Unit Tests
         run: |
