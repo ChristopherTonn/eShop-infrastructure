@@ -4,7 +4,7 @@ on:
   workflow_run:
     workflows: ["🔨 Continuous Integration"]
     types: [completed]
-    branches: [develop, staging, main]
+    branches: [develop, staging, main, feature/ci-cd-implementation]
 
 env:
   DOTNET_VERSION: '10.0.x'
