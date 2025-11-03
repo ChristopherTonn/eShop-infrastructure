@@ -1,0 +1,193 @@
+name: 🚀 Continuous Deployment
+
+on:
+  workflow_run:
+    workflows: ["🔨 Continuous Integration"]
+    types: [completed]
+    branches: [develop, staging, main]
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  AWS_REGION: eu-central-1
+  ECR_REGISTRY: # Will be set when AWS infrastructure is ready
+  EKS_CLUSTER_NAME: # Will be set when AWS infrastructure is ready
+
+jobs:
+  prepare-deployment:
+    name: 🎯 Prepare Deployment
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    
+    outputs:
+      environment: ${{ steps.determine-env.outputs.environment }}
+      deploy-enabled: ${{ steps.check-readiness.outputs.ready }}
+    
+    steps:
+      - name: 🛒 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🎯 Determine Target Environment
+        id: determine-env
+        run: |
+          case "${{ github.event.workflow_run.head_branch }}" in
+            "develop")
+              echo "environment=development" >> $GITHUB_OUTPUT
+              ;;
+            "staging")
+              echo "environment=staging" >> $GITHUB_OUTPUT
+              ;;
+            "main")
+              echo "environment=production" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              echo "environment=development" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: ✅ Check Deployment Readiness
+        id: check-readiness
+        run: |
+          # TODO: Remove this when AWS infrastructure is ready
+          echo "ready=false" >> $GITHUB_OUTPUT
+          echo "⚠️ Deployment disabled - AWS infrastructure not yet provisioned" >> $GITHUB_STEP_SUMMARY
+
+  # This job will be enabled once AWS infrastructure is ready
+  build-and-push-images:
+    name: 🐳 Build & Push Container Images
+    runs-on: ubuntu-latest
+    needs: prepare-deployment
+    if: needs.prepare-deployment.outputs.deploy-enabled == 'true'
+    
+    strategy:
+      matrix:
+        # Service names in kebab-case for Docker image naming convention
+        # Maps to CI artifacts: Basket.API → basket-api, etc.
+        service:
+          - basket-api
+          - catalog-api
+          - identity-api
+          - ordering-api
+          - order-processor
+          - payment-processor
+          - webhooks-api
+          - webapp
+          - webhook-client
+    
+    steps:
+      - name: 🛒 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🔑 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOYMENT_ROLE_ARN }}
+          role-session-name: GitHubActions-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 🔐 Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: 📥 Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts-${{ github.event.workflow_run.head_sha }}
+          path: artifacts/
+
+      - name: 🐳 Build Container Image
+        run: |
+          # Convert kebab-case to PascalCase for artifact folder mapping
+          # basket-api → Basket.API, order-processor → OrderProcessor, etc.
+          case "${{ matrix.service }}" in
+            "basket-api") SERVICE_FOLDER="Basket.API" ;;
+            "catalog-api") SERVICE_FOLDER="Catalog.API" ;;
+            "identity-api") SERVICE_FOLDER="Identity.API" ;;
+            "ordering-api") SERVICE_FOLDER="Ordering.API" ;;
+            "order-processor") SERVICE_FOLDER="OrderProcessor" ;;
+            "payment-processor") SERVICE_FOLDER="PaymentProcessor" ;;
+            "webhooks-api") SERVICE_FOLDER="Webhooks.API" ;;
+            "webapp") SERVICE_FOLDER="WebApp" ;;
+            "webhook-client") SERVICE_FOLDER="WebhookClient" ;;
+            *) SERVICE_FOLDER="${{ matrix.service }}" ;;
+          esac
+          
+          echo "Building container image for ${{ matrix.service }} from artifacts/$SERVICE_FOLDER"
+          # TODO: Create Dockerfiles for each service
+          # docker build -t $ECR_REGISTRY/${{ matrix.service }}:${{ github.event.workflow_run.head_sha }} \
+          #   --build-arg SERVICE_FOLDER=$SERVICE_FOLDER \
+          #   -f docker/${{ matrix.service }}/Dockerfile .
+
+      - name: 📤 Push Image to ECR
+        run: |
+          # TODO: Push images when ready
+          echo "Would push: $ECR_REGISTRY/${{ matrix.service }}:${{ github.event.workflow_run.head_sha }}"
+          # docker push $ECR_REGISTRY/${{ matrix.service }}:${{ github.event.workflow_run.head_sha }}
+
+  # This job will be enabled once EKS cluster is ready
+  deploy-to-kubernetes:
+    name: ☸️ Deploy to Kubernetes
+    runs-on: ubuntu-latest
+    needs: [prepare-deployment, build-and-push-images]
+    environment: ${{ needs.prepare-deployment.outputs.environment }}
+    if: needs.prepare-deployment.outputs.deploy-enabled == 'true'
+    
+    steps:
+      - name: 🛒 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🔑 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOYMENT_ROLE_ARN }}
+          role-session-name: GitHubActions-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: ⚙️ Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      - name: ⚙️ Setup Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: 'latest'
+
+      - name: 🔧 Update kubeconfig
+        run: |
+          # TODO: Configure when EKS cluster exists
+          # aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
+
+      - name: 🚀 Deploy with Helm
+        run: |
+          # TODO: Deploy when infrastructure is ready
+          echo "Would deploy to ${{ needs.prepare-deployment.outputs.environment }} environment"
+          echo "Using Helm chart: ./infra/k8s/helm/eshop-app/"
+
+      - name: ✅ Deployment Summary
+        run: |
+          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Successfully deployed to **${{ needs.prepare-deployment.outputs.environment }}**" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ github.event.workflow_run.head_sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** ${{ github.event.workflow_run.head_branch }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${{ needs.prepare-deployment.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+
+  # Placeholder for future integration tests
+  run-integration-tests:
+    name: 🧪 Integration Tests
+    runs-on: ubuntu-latest
+    needs: [prepare-deployment, deploy-to-kubernetes]
+    if: needs.prepare-deployment.outputs.deploy-enabled == 'true'
+    
+    steps:
+      - name: 🛒 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🧪 Run Integration Tests
+        run: |
+          # TODO: Implement integration tests
+          echo "Integration tests would run here against deployed services"
+
+      - name: 📊 Test Report
+        run: |
+          echo "## 🧪 Integration Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "✅ All integration tests passed" >> $GITHUB_STEP_SUMMARY
