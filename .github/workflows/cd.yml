@@ -1,6 +1,11 @@
 name: 🚀 Continuous Deployment
 
 on:
+  push:
+    branches: [develop, staging, main, feature/ci-cd-implementation]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
   workflow_run:
     workflows: ["🔨 Continuous Integration"]
     types: [completed]
@@ -27,7 +32,7 @@ jobs:
   prepare-deployment:
     name: 🎯 Prepare Deployment
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.event.workflow_run.conclusion == 'success' }}
     
     outputs:
       environment: ${{ steps.determine-env.outputs.environment }}
@@ -42,6 +47,21 @@ jobs:
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event_name }}" == "push" ]]; then
+            case "${{ github.ref_name }}" in
+              "develop")
+                echo "environment=development" >> $GITHUB_OUTPUT
+                ;;
+              "staging")
+                echo "environment=staging" >> $GITHUB_OUTPUT
+                ;;
+              "main")
+                echo "environment=production" >> $GITHUB_OUTPUT
+                ;;
+              *)
+                echo "environment=development" >> $GITHUB_OUTPUT
+                ;;
+            esac
           else
             case "${{ github.event.workflow_run.head_branch }}" in
               "develop")
