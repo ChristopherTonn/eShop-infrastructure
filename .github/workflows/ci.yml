@@ -48,7 +48,7 @@ jobs:
       - name: 📦 Cache NuGet Packages
         uses: actions/cache@v4
         with:
-          path: ~/.nuget/packages
+          path: ${{ runner.temp }}/nuget-cache
           key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/Directory.Packages.props') }}
           restore-keys: |
             ${{ runner.os }}-nuget-
@@ -56,7 +56,7 @@ jobs:
       - name: 🔄 Restore Dependencies
         run: dotnet restore src/${{ matrix.service }}/${{ matrix.service }}.csproj
         env:
-          NUGET_PACKAGES: ~/.nuget/packages
+          NUGET_PACKAGES: ${{ runner.temp }}/nuget-cache
 
       - name: 🏗️ Build Service
         run: dotnet build src/${{ matrix.service }}/${{ matrix.service }}.csproj --no-restore --configuration ${{ env.DOTNET_CONFIGURATION }}
@@ -132,7 +132,7 @@ jobs:
       - name: 📦 Cache NuGet Packages
         uses: actions/cache@v4
         with:
-          path: ~/.nuget/packages
+          path: ${{ runner.temp }}/nuget-cache
           key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/Directory.Packages.props') }}
           restore-keys: |
             ${{ runner.os }}-nuget-
@@ -140,7 +140,7 @@ jobs:
       - name: 🔄 Restore Solution
         run: dotnet restore eShop.slnx
         env:
-          NUGET_PACKAGES: ~/.nuget/packages
+          NUGET_PACKAGES: ${{ runner.temp }}/nuget-cache
 
       - name: 🏗️ Build Solution
         run: dotnet build eShop.slnx --no-restore --configuration ${{ env.DOTNET_CONFIGURATION }}
