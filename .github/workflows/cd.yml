@@ -5,6 +5,17 @@ on:
     workflows: ["🔨 Continuous Integration"]
     types: [completed]
     branches: [develop, staging, main, feature/ci-cd-implementation]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+        - development
+        - staging
+        - production
 
 env:
   DOTNET_VERSION: '10.0.x'
@@ -29,20 +40,24 @@ jobs:
       - name: 🎯 Determine Target Environment
         id: determine-env
         run: |
-          case "${{ github.event.workflow_run.head_branch }}" in
-            "develop")
-              echo "environment=development" >> $GITHUB_OUTPUT
-              ;;
-            "staging")
-              echo "environment=staging" >> $GITHUB_OUTPUT
-              ;;
-            "main")
-              echo "environment=production" >> $GITHUB_OUTPUT
-              ;;
-            *)
-              echo "environment=development" >> $GITHUB_OUTPUT
-              ;;
-          esac
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+          else
+            case "${{ github.event.workflow_run.head_branch }}" in
+              "develop")
+                echo "environment=development" >> $GITHUB_OUTPUT
+                ;;
+              "staging")
+                echo "environment=staging" >> $GITHUB_OUTPUT
+                ;;
+              "main")
+                echo "environment=production" >> $GITHUB_OUTPUT
+                ;;
+              *)
+                echo "environment=development" >> $GITHUB_OUTPUT
+                ;;
+            esac
+          fi
 
       - name: ✅ Check Deployment Readiness
         id: check-readiness
