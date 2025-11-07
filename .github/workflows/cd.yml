@@ -4,8 +4,8 @@ on:
   push:
     branches: [develop, staging, main, feature/ci-cd-implementation]
     paths-ignore:
-      - '**.md'
-      - 'docs/**'
+      - "**.md"
+      - "docs/**"
   workflow_run:
     workflows: ["🔨 Continuous Integration"]
     types: [completed]
@@ -13,17 +13,17 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Target environment'
+        description: "Target environment"
         required: true
-        default: 'development'
+        default: "development"
         type: choice
         options:
-        - development
-        - staging
-        - production
+          - development
+          - staging
+          - production
 
 env:
-  DOTNET_VERSION: '10.0.x'
+  DOTNET_VERSION: "10.0.x"
   AWS_REGION: eu-central-1
   ECR_REGISTRY: # Will be set when AWS infrastructure is ready
   EKS_CLUSTER_NAME: # Will be set when AWS infrastructure is ready
@@ -33,11 +33,11 @@ jobs:
     name: 🎯 Prepare Deployment
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.event.workflow_run.conclusion == 'success' }}
-    
+
     outputs:
       environment: ${{ steps.determine-env.outputs.environment }}
       deploy-enabled: ${{ steps.check-readiness.outputs.ready }}
-    
+
     steps:
       - name: 🛒 Checkout Code
         uses: actions/checkout@v4
@@ -93,7 +93,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: prepare-deployment
     if: needs.prepare-deployment.outputs.deploy-enabled == 'true'
-    
+
     strategy:
       matrix:
         # Service names in kebab-case for Docker image naming convention
@@ -108,7 +108,7 @@ jobs:
           - webhooks-api
           - webapp
           - webhook-client
-    
+
     steps:
       - name: 🛒 Checkout Code
         uses: actions/checkout@v4
@@ -146,7 +146,7 @@ jobs:
             "webhook-client") SERVICE_FOLDER="WebhookClient" ;;
             *) SERVICE_FOLDER="${{ matrix.service }}" ;;
           esac
-          
+
           echo "Building container image for ${{ matrix.service }} from artifacts/$SERVICE_FOLDER"
           # TODO: Create Dockerfiles for each service
           # docker build -t $ECR_REGISTRY/${{ matrix.service }}:${{ github.event.workflow_run.head_sha }} \
@@ -166,7 +166,7 @@ jobs:
     needs: [prepare-deployment, build-and-push-images]
     environment: ${{ needs.prepare-deployment.outputs.environment }}
     if: needs.prepare-deployment.outputs.deploy-enabled == 'true'
-    
+
     steps:
       - name: 🛒 Checkout Code
         uses: actions/checkout@v4
@@ -181,12 +181,12 @@ jobs:
       - name: ⚙️ Setup kubectl
         uses: azure/setup-kubectl@v3
         with:
-          version: 'latest'
+          version: "latest"
 
       - name: ⚙️ Setup Helm
         uses: azure/setup-helm@v3
         with:
-          version: 'latest'
+          version: "latest"
 
       - name: 🔧 Update kubeconfig
         run: |
@@ -213,7 +213,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [prepare-deployment, deploy-to-kubernetes]
     if: needs.prepare-deployment.outputs.deploy-enabled == 'true'
-    
+
     steps:
       - name: 🛒 Checkout Code
         uses: actions/checkout@v4
