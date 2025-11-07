@@ -16,6 +16,7 @@ jobs:
   build-and-test:
     name: 🏗️ Build & Test .NET Services
     runs-on: ubuntu-latest
+    environment: dev #testing environment
 
     strategy:
       matrix:
