@@ -70,6 +70,12 @@ variable "enable_network_policy" {
   default     = false
 }
 
+variable "ssh_key_name" {
+  description = "EC2 SSH Key name for node group access"
+  type        = string
+  default     = ""
+}
+
 variable "tags" {
   description = "Tags to apply to resources"
   type        = map(string)
