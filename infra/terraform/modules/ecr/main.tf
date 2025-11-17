@@ -88,10 +88,7 @@ resource "aws_ecr_repository_policy" "main" {
         Sid    = "GitHubActionsAccess"
         Effect = "Allow"
         Principal = {
-          AWS = [
-            # TODO: Add GitHub OIDC role ARN when created
-            # "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/github-actions-role"
-          ]
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
         }
         Action = [
           "ecr:GetAuthorizationToken",

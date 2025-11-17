@@ -20,14 +20,13 @@ terraform {
     }
   }
 
-  # TODO: Configure after S3 bucket is created
-  # backend "s3" {
-  #   bucket         = "eshop-terraform-state-dev"
-  #   key            = "dev/terraform.tfstate"
-  #   region         = "eu-central-1"
-  #   dynamodb_table = "eshop-terraform-lock-dev"
-  #   encrypt        = true
-  # }
+  backend "s3" {
+    bucket         = "eshop-1763393223-terraform-state-dev"
+    key            = "dev/terraform.tfstate"
+    region         = "eu-central-1"
+    dynamodb_table = "eshop-1763393223-terraform-lock-dev"
+    encrypt        = true
+  }
 }
 
 # ============================================================================
