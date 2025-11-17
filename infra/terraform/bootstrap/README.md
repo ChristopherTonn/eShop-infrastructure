@@ -5,22 +5,26 @@ Diese Bootstrap-Konfiguration erstellt die erforderliche Infrastruktur für Terr
 ## 📋 Was wird erstellt
 
 ### S3 Buckets (Terraform State Storage)
+
 - `eshop-terraform-state-dev`
-- `eshop-terraform-state-staging` 
+- `eshop-terraform-state-staging`
 - `eshop-terraform-state-prod`
 
 **Features:**
+
 - ✅ Versioning aktiviert
 - ✅ Server-side Encryption (AES256)
 - ✅ Public Access blockiert
 - ✅ Environment-spezifische Trennung
 
 ### DynamoDB Tables (State Locking)
+
 - `eshop-terraform-lock-dev`
 - `eshop-terraform-lock-staging`
 - `eshop-terraform-lock-prod`
 
 **Features:**
+
 - ✅ Pay-per-request Billing
 - ✅ Automatic State Locking
 - ✅ Conflict Prevention
@@ -28,6 +32,7 @@ Diese Bootstrap-Konfiguration erstellt die erforderliche Infrastruktur für Terr
 ## 🛠️ Setup Instructions
 
 ### 1️⃣ Bootstrap ausführen
+
 ```bash
 # In das Bootstrap-Verzeichnis wechseln
 cd infra/terraform/bootstrap
@@ -50,6 +55,7 @@ terraform apply
 Nach dem Bootstrap, die Backend-Konfigurationen in den Environment-Dateien aktivieren:
 
 **`envs/dev/main.tf`**
+
 ```hcl
 terraform {
   backend "s3" {
@@ -63,6 +69,7 @@ terraform {
 ```
 
 **`envs/staging/main.tf`**
+
 ```hcl
 terraform {
   backend "s3" {
@@ -76,6 +83,7 @@ terraform {
 ```
 
 **`envs/prod/main.tf`**
+
 ```hcl
 terraform {
   backend "s3" {
@@ -91,12 +99,13 @@ terraform {
 ### 3️⃣ State Migration durchführen
 
 Für jede Environment:
+
 ```bash
 # Development
 cd ../envs/dev
 terraform init
 
-# Staging  
+# Staging
 cd ../staging
 terraform init
 
@@ -108,16 +117,19 @@ terraform init
 ## ⚠️ Wichtige Hinweise
 
 ### Bootstrap State Management
+
 - **Bootstrap läuft lokal:** Keine Remote-State für Bootstrap selbst
 - **Backup Bootstrap State:** `terraform.tfstate` sollte versioniert werden
 - **Team-Zugriff:** Bootstrap sollte nur von einem Administrator ausgeführt werden
 
 ### Security Considerations
+
 - ✅ S3 Buckets sind privat und verschlüsselt
 - ✅ DynamoDB-Tabellen haben IAM-Zugriffskontrollen
 - ✅ State-Dateien enthalten sensible Daten → Zugriff beschränken
 
 ### Cost Optimization
+
 - **S3:** Standard-Tier für häufigen Zugriff
 - **DynamoDB:** Pay-per-request für kosteneffiziente Nutzung
 - **Monitoring:** CloudWatch-Metriken aktiviert
@@ -145,4 +157,5 @@ terraform destroy
 3. **CI/CD:** Nutzt State-Backend für automatische Deployments
 
 ---
+
 **📝 Nach erfolgreichem Bootstrap:** Aktiviere Backend-Konfigurationen in Environment-Files!

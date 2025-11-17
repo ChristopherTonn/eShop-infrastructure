@@ -63,3 +63,21 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "backup_retention_limit" {
+  description = "Number of days to retain backup snapshots"
+  type        = number
+  default     = 7
+}
+
+variable "backup_window" {
+  description = "Daily time range for backup snapshots"
+  type        = string
+  default     = "03:00-05:00"
+}
+
+variable "maintenance_window" {
+  description = "Weekly maintenance window"
+  type        = string
+  default     = "sun:05:00-sun:06:00"
+}

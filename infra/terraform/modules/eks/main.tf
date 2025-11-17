@@ -196,7 +196,7 @@ resource "aws_eks_cluster" "main" {
     for_each = var.enable_cluster_encryption ? [1] : []
     content {
       provider {
-        key_id = aws_kms_key.cluster[0].arn
+        key_arn = aws_kms_key.cluster[0].arn
       }
       resources = ["secrets"]
     }
