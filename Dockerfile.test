@@ -1,0 +1,45 @@
+# Simple Test App for eShop Demo
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
+WORKDIR /app
+EXPOSE 8080
+
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+WORKDIR /src
+
+# Create project file first
+RUN echo '<Project Sdk="Microsoft.NET.Sdk.Web"> \
+  <PropertyGroup> \
+    <TargetFramework>net9.0</TargetFramework> \
+    <Nullable>enable</Nullable> \
+  </PropertyGroup> \
+</Project>' > TestApp.csproj
+
+# Create a minimal web API
+RUN echo 'using Microsoft.AspNetCore.Builder; \
+using Microsoft.AspNetCore.Http; \
+using System; \
+\
+var builder = WebApplication.CreateBuilder(args); \
+var app = builder.Build(); \
+\
+app.MapGet("/", () => "🛒 eShop Demo API - Running on AWS EKS!"); \
+app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow })); \
+app.MapGet("/info", () => Results.Ok(new { \
+    service = "eShop Demo", \
+    environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production", \
+    hostname = Environment.MachineName, \
+    version = "1.0.0" \
+})); \
+\
+app.Run();' > Program.cs
+
+RUN dotnet restore TestApp.csproj
+RUN dotnet build TestApp.csproj -c Release -o /app/build
+
+FROM build AS publish
+RUN dotnet publish TestApp.csproj -c Release -o /app/publish
+
+FROM base AS final
+WORKDIR /app
+COPY --from=publish /app/publish .
+ENTRYPOINT ["dotnet", "TestApp.dll"]

@@ -491,3 +491,10 @@ $RECYCLE.BIN/
 /playwright/.auth/
 /user.json
 .azure
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+.terraform.lock.hcl

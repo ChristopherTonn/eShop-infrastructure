@@ -50,7 +50,7 @@ provider "aws" {
 
 locals {
   environment = "dev"
-  name_prefix = "${var.project_name}-${local.environment}"
+  name_prefix = "eshop-1763393223-${local.environment}"  # Keep existing unique timestamp
   
   # Development-specific overrides
   vpc_cidr = "10.0.0.0/16"
@@ -172,9 +172,13 @@ module "elasticache" {
   vpc_id             = module.vpc.vpc_id
   private_subnet_ids = module.vpc.private_subnet_ids
   
-  node_type          = local.elasticache_node_type
-  num_cache_nodes    = var.elasticache_num_cache_nodes
-  engine_version     = var.elasticache_engine_version
+  node_type                    = local.elasticache_node_type
+  num_cache_nodes              = var.elasticache_num_cache_nodes
+  engine_version               = var.elasticache_engine_version
+  
+  # Encryption configuration for DEV environment
+  enable_encryption_at_rest    = false  # DEV: Keep costs low
+  enable_encryption_in_transit = false  # DEV: Avoid auth_token complexity
   
   tags = merge(var.common_tags, {
     Environment = "development"

@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eshop-demo
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: eshop-demo
+  template:
+    metadata:
+      labels:
+        app: eshop-demo
+    spec:
+      containers:
+        - name: webapp
+          image: nginx:alpine
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: html
+              mountPath: /usr/share/nginx/html/index.html
+              subPath: index.html
+      volumes:
+        - name: html
+          configMap:
+            name: eshop-html
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: eshop-html
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>eShop Demo - Running on AWS EKS!</title>
+        <style>
+            body { font-family: Arial; margin: 40px; background: #f5f5f5; }
+            .container { background: white; padding: 30px; border-radius: 10px; }
+            .success { color: #28a745; font-size: 24px; font-weight: bold; }
+            .info { margin: 20px 0; padding: 20px; background: #e3f2fd; border-radius: 5px; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1 class="success">🎉 eShop Successfully Running on AWS!</h1>
+            
+            <div class="info">
+                <h3>Infrastructure Status:</h3>
+                <ul>
+                    <li>✅ EKS Cluster: eshop-1763393223-dev-cluster</li>
+                    <li>✅ PostgreSQL RDS Database</li>
+                    <li>✅ Redis ElastiCache</li>
+                    <li>✅ Container Registry (ECR)</li>
+                    <li>✅ VPC with 3 Availability Zones</li>
+                </ul>
+            </div>
+            
+            <div class="info">
+                <h3>Cost Optimization:</h3>
+                <p>This is a minimal demo deployment. For the full eShop microservices architecture, additional costs would apply.</p>
+                <p><strong>Current estimated cost:</strong> ~$320/month for infrastructure</p>
+            </div>
+
+            <div class="info">
+                <h3>Next Steps:</h3>
+                <ol>
+                    <li>Deploy full microservices architecture</li>
+                    <li>Configure databases and Redis</li>
+                    <li>Set up ingress and SSL</li>
+                    <li>Enable monitoring and logging</li>
+                </ol>
+            </div>
+            
+            <p><em>Deployment Time: $(date)</em></p>
+        </div>
+    </body>
+    </html>
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eshop-demo-service
+spec:
+  selector:
+    app: eshop-demo
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  type: LoadBalancer
