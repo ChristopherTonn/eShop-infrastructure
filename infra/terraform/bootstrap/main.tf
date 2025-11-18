@@ -47,35 +47,41 @@ variable "project_name" {
   default     = "eshop"
 }
 
+variable "unique_suffix" {
+  description = "Unique suffix to avoid S3 bucket naming conflicts"
+  type        = string
+  default     = ""
+}
+
 # ============================================================================
 # S3 Buckets for Terraform State
 # ============================================================================
 
 resource "aws_s3_bucket" "terraform_state_dev" {
-  bucket = "${var.project_name}-terraform-state-dev"
+  bucket = "${var.project_name}-terraform-state-dev${var.unique_suffix}"
 
   tags = {
-    Name        = "${var.project_name}-terraform-state-dev"
+    Name        = "${var.project_name}-terraform-state-dev${var.unique_suffix}"
     Environment = "development"
     Type        = "terraform-state"
   }
 }
 
 resource "aws_s3_bucket" "terraform_state_staging" {
-  bucket = "${var.project_name}-terraform-state-staging"
+  bucket = "${var.project_name}-terraform-state-staging${var.unique_suffix}"
 
   tags = {
-    Name        = "${var.project_name}-terraform-state-staging"
+    Name        = "${var.project_name}-terraform-state-staging${var.unique_suffix}"
     Environment = "staging"
     Type        = "terraform-state"
   }
 }
 
 resource "aws_s3_bucket" "terraform_state_prod" {
-  bucket = "${var.project_name}-terraform-state-prod"
+  bucket = "${var.project_name}-terraform-state-prod${var.unique_suffix}"
 
   tags = {
-    Name        = "${var.project_name}-terraform-state-prod"
+    Name        = "${var.project_name}-terraform-state-prod${var.unique_suffix}"
     Environment = "production"
     Type        = "terraform-state"
   }
@@ -171,9 +177,9 @@ resource "aws_s3_bucket_public_access_block" "terraform_state_prod" {
 # ============================================================================
 
 resource "aws_dynamodb_table" "terraform_lock_dev" {
-  name           = "${var.project_name}-terraform-lock-dev"
-  billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "LockID"
+  name         = "${var.project_name}-terraform-lock-dev${var.unique_suffix}"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "LockID"
 
   attribute {
     name = "LockID"
@@ -181,14 +187,14 @@ resource "aws_dynamodb_table" "terraform_lock_dev" {
   }
 
   tags = {
-    Name        = "${var.project_name}-terraform-lock-dev"
+    Name        = "${var.project_name}-terraform-lock-dev${var.unique_suffix}"
     Environment = "development"
     Type        = "terraform-lock"
   }
 }
 
 resource "aws_dynamodb_table" "terraform_lock_staging" {
-  name           = "${var.project_name}-terraform-lock-staging"
+  name           = "${var.project_name}-terraform-lock-staging${var.unique_suffix}"
   billing_mode   = "PAY_PER_REQUEST"
   hash_key       = "LockID"
 
@@ -198,14 +204,14 @@ resource "aws_dynamodb_table" "terraform_lock_staging" {
   }
 
   tags = {
-    Name        = "${var.project_name}-terraform-lock-staging"
+    Name        = "${var.project_name}-terraform-lock-staging${var.unique_suffix}"
     Environment = "staging"
     Type        = "terraform-lock"
   }
 }
 
 resource "aws_dynamodb_table" "terraform_lock_prod" {
-  name           = "${var.project_name}-terraform-lock-prod"
+  name           = "${var.project_name}-terraform-lock-prod${var.unique_suffix}"
   billing_mode   = "PAY_PER_REQUEST"
   hash_key       = "LockID"
 
@@ -215,7 +221,7 @@ resource "aws_dynamodb_table" "terraform_lock_prod" {
   }
 
   tags = {
-    Name        = "${var.project_name}-terraform-lock-prod"
+    Name        = "${var.project_name}-terraform-lock-prod${var.unique_suffix}"
     Environment = "production"
     Type        = "terraform-lock"
   }
