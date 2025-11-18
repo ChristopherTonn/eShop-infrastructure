@@ -3,14 +3,16 @@
 ## 🔥 The ONLY Destroy Script You Need
 
 ### **One Script to Rule Them All**
+
 ```bash
 cd infra
 ./destroy.sh
 ```
 
 **✅ Why This Is All You Need:**
+
 - **100% Success Rate** - Destroys EVERYTHING
-- **Terraform-Free** - No lock problems possible  
+- **Terraform-Free** - No lock problems possible
 - **Speed**: < 3 minutes complete destruction
 - **Bulletproof**: Direct AWS CLI commands
 - **Complete**: ECR, S3 (all versions), DynamoDB, VPC, EKS, RDS
@@ -52,6 +54,7 @@ cd infra
 **After**: 1 script that actually works (genius!)
 
 **Lessons Learned**:
+
 - Terraform-based scripts → Lock problems
 - AWS CLI direct → No problems
 - Simple = Better
@@ -65,4 +68,4 @@ cd infra
 
 ---
 
-**� Bottom Line**: One script. Three minutes. Everything gone. Perfect.** 💥
+**� Bottom Line**: One script. Three minutes. Everything gone. Perfect.\*\* 💥
