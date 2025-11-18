@@ -22,13 +22,21 @@ echo -e "${YELLOW}Bypasses ALL Terraform problems + destroys EVERYTHING!${NC}"
 echo ""
 
 # Get current terraform values (if possible)
-TERRAFORM_DIR="terraform/envs/dev"
-cd "$TERRAFORM_DIR"
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+TERRAFORM_DIR="$SCRIPT_DIR/terraform/envs/dev"
+
+if [[ -d "$TERRAFORM_DIR" ]]; then
+    cd "$TERRAFORM_DIR"
+    TERRAFORM_AVAILABLE=true
+else
+    echo -e "${YELLOW}⚠️ Terraform directory not found, using AWS CLI only${NC}"
+    TERRAFORM_AVAILABLE=false
+fi
 
 # Try to get resource info (with timeout)
 CLUSTER_NAME=""
 VPC_ID=""
-if timeout 10 terraform show -json >/dev/null 2>&1; then
+if [[ "$TERRAFORM_AVAILABLE" == "true" ]] && timeout 10 terraform show -json >/dev/null 2>&1; then
     CLUSTER_NAME=$(terraform output -raw cluster_name 2>/dev/null || echo "")
     VPC_ID=$(terraform output -raw vpc_id 2>/dev/null || echo "")
 fi
@@ -99,14 +107,53 @@ echo "✅ ElastiCache destruction initiated"
 # Phase 5: ECR Cleanup
 echo -e "${RED}💥 Phase 5: ECR Instant Cleanup${NC}"
 echo "Cleaning ECR repositories..."
-aws ecr describe-repositories --region eu-central-1 --query "repositories[?contains(repositoryName, 'eshop-1763393223')].repositoryName" --output text 2>/dev/null | \
-head -5 | xargs -r -P 3 -I {} bash -c 'aws ecr list-images --repository-name {} --region eu-central-1 --query "imageIds[*]" --output json 2>/dev/null | jq -c ".[]" | head -20 | xargs -r -I % aws ecr batch-delete-image --repository-name {} --region eu-central-1 --image-ids % >/dev/null 2>&1 || true'
+
+# Get ECR repositories and delete them one by one
+ECR_REPOS=$(aws ecr describe-repositories --region eu-central-1 --query "repositories[?contains(repositoryName, 'eshop')].repositoryName" --output text 2>/dev/null || echo "")
+if [[ -n "$ECR_REPOS" ]]; then
+    for REPO in $ECR_REPOS; do
+        echo "  🗑️ Deleting ECR repo: $REPO"
+        aws ecr delete-repository --repository-name "$REPO" --region eu-central-1 --force >/dev/null 2>&1 || true
+    done
+fi
 echo "✅ ECR cleaned"
 
 # Phase 6: Wait and VPC Destruction
 echo -e "${RED}💥 Phase 6: VPC Destruction (after dependencies)${NC}"
-echo "Waiting 60 seconds for dependencies to clear..."
-sleep 60
+echo "Waiting for main resources to be deleted..."
+
+# Wait for EKS cluster to be deleted
+if [[ -n "$CLUSTER_NAME" ]]; then
+    echo "  ⏳ Waiting for EKS cluster deletion..."
+    WAIT_TIME=0
+    while [[ $WAIT_TIME -lt 600 ]]; do  # Max 10 minutes
+        if ! aws eks describe-cluster --name "$CLUSTER_NAME" --region eu-central-1 >/dev/null 2>&1; then
+            echo "  ✅ EKS cluster deleted!"
+            break
+        fi
+        echo "  ⏳ EKS still deleting... ($WAIT_TIME/600s)"
+        sleep 30
+        WAIT_TIME=$((WAIT_TIME + 30))
+    done
+fi
+
+# Wait for RDS to be deleted  
+RDS_INSTANCE=$(aws rds describe-db-instances --region eu-central-1 --query "DBInstances[?contains(DBInstanceIdentifier, 'eshop')].DBInstanceIdentifier" --output text 2>/dev/null || echo "")
+if [[ -n "$RDS_INSTANCE" ]]; then
+    echo "  ⏳ Waiting for RDS deletion..."
+    WAIT_TIME=0
+    while [[ $WAIT_TIME -lt 900 ]]; do  # Max 15 minutes
+        if ! aws rds describe-db-instances --db-instance-identifier "$RDS_INSTANCE" --region eu-central-1 >/dev/null 2>&1; then
+            echo "  ✅ RDS deleted!"
+            break
+        fi
+        echo "  ⏳ RDS still deleting... ($WAIT_TIME/900s)"
+        sleep 30
+        WAIT_TIME=$((WAIT_TIME + 30))
+    done
+fi
+
+echo "  ✅ Main resources cleanup wait completed"
 
 if [[ -n "$VPC_ID" ]]; then
     echo "Destroying VPC infrastructure: $VPC_ID"
@@ -152,8 +199,13 @@ echo -e "${RED}💥 Phase 7: Complete AWS Resource Cleanup${NC}"
 
 # 7.1 ECR Repository Cleanup
 echo "7.1 Destroying ECR repositories..."
-aws ecr describe-repositories --region eu-central-1 --query "repositories[?contains(repositoryName, 'eshop')].repositoryName" --output text 2>/dev/null | \
-xargs -r -P 3 -I {} aws ecr delete-repository --repository-name {} --region eu-central-1 --force >/dev/null 2>&1 || true
+ECR_REPOS=$(aws ecr describe-repositories --region eu-central-1 --query "repositories[?contains(repositoryName, 'eshop')].repositoryName" --output text 2>/dev/null || echo "")
+if [[ -n "$ECR_REPOS" ]]; then
+    for REPO in $ECR_REPOS; do
+        echo "  🗑️ Deleting ECR repo: $REPO"
+        aws ecr delete-repository --repository-name "$REPO" --region eu-central-1 --force >/dev/null 2>&1 || true
+    done
+fi
 
 # 7.2 S3 Buckets Complete Cleanup (including versioned objects)
 echo "7.2 Destroying S3 buckets (including all versions)..."
