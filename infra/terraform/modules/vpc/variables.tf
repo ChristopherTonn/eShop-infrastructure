@@ -28,6 +28,12 @@ variable "enable_vpc_flow_logs" {
   default     = true
 }
 
+variable "single_nat_gateway" {
+  description = "Use single NAT gateway to save costs (for dev environments)"
+  type        = bool
+  default     = false
+}
+
 variable "tags" {
   description = "Tags to apply to resources"
   type        = map(string)
