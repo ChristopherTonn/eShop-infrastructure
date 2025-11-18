@@ -21,10 +21,10 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "eshop-1763393223-terraform-state-dev"
+    bucket         = "eshop-terraform-state-dev-20251118170326"
     key            = "dev/terraform.tfstate"
     region         = "eu-central-1"
-    dynamodb_table = "eshop-1763393223-terraform-lock-dev"
+    dynamodb_table = "eshop-terraform-lock-dev-20251118170326"
     encrypt        = true
   }
 }
@@ -50,10 +50,13 @@ provider "aws" {
 
 locals {
   environment = "dev"
-  name_prefix = "eshop-1763393223-${local.environment}"  # Keep existing unique timestamp
+  name_prefix = "eshop-20251118170326-${local.environment}"  # Keep existing unique timestamp
   
   # Development-specific overrides
   vpc_cidr = "10.0.0.0/16"
+  
+  # DEV: Reduce AZ count to save EIPs (only 1 NAT Gateway instead of 3)
+  availability_zones_dev = ["eu-central-1a", "eu-central-1b"]  # Only 2 AZs for DEV
   
   # Smaller instances for dev
   eks_node_instance_types = ["t3.medium"]
@@ -77,7 +80,8 @@ module "vpc" {
   environment        = local.environment
   name_prefix       = local.name_prefix
   vpc_cidr          = local.vpc_cidr
-  availability_zones = var.availability_zones
+  availability_zones = local.availability_zones_dev  # Use reduced AZ count for DEV
+  single_nat_gateway = true  # DEV: Use only 1 NAT Gateway to save EIPs
   
   enable_vpc_flow_logs = var.enable_vpc_flow_logs
   
