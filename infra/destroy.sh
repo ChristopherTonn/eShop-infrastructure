@@ -1,283 +1,109 @@
 #!/bin/bash
 
-# ============================================================================
-# eShop INSTANT AWS TOTAL DESTROYER v2.0 (Terraform-Free)
-# Zerstört 100% ALLES über AWS CLI - kein Terraform Lock Problem!
-# Lessons Learned: ECR, S3 Versioning, DynamoDB, Load Balancer Dependencies
-# ============================================================================
+# eShop Cleanup Script - .NET Aspire Version
+# Beendet Aspire-Prozesse und räumt lokale Ressourcen auf
 
 set -e
 
-# Farben
-RED='\033[0;31m'
-YELLOW='\033[1;33m'
+# Farben für Output
 GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-BOLD='\033[1m'
-NC='\033[0m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
 
-echo -e "${RED}${BOLD}⚡ eShop INSTANT TOTAL DESTROYER v2.0 ⚡${NC}"
-echo -e "${RED}${BOLD}======================================${NC}"
-echo -e "${YELLOW}Bypasses ALL Terraform problems + destroys EVERYTHING!${NC}"
+echo -e "${YELLOW}🧹 eShop Cleanup - Stopping Aspire Services${NC}"
+echo "==========================================="
 echo ""
 
-# Get current terraform values (if possible)
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-TERRAFORM_DIR="$SCRIPT_DIR/terraform/envs/dev"
+# 1. Stoppe Aspire Prozess
+echo -e "${YELLOW}📋 Step 1: Stop Aspire Process${NC}"
 
-if [[ -d "$TERRAFORM_DIR" ]]; then
-    cd "$TERRAFORM_DIR"
-    TERRAFORM_AVAILABLE=true
-else
-    echo -e "${YELLOW}⚠️ Terraform directory not found, using AWS CLI only${NC}"
-    TERRAFORM_AVAILABLE=false
-fi
-
-# Try to get resource info (with timeout)
-CLUSTER_NAME=""
-VPC_ID=""
-if [[ "$TERRAFORM_AVAILABLE" == "true" ]] && timeout 10 terraform show -json >/dev/null 2>&1; then
-    CLUSTER_NAME=$(terraform output -raw cluster_name 2>/dev/null || echo "")
-    VPC_ID=$(terraform output -raw vpc_id 2>/dev/null || echo "")
-fi
-
-# If terraform is stuck, find resources by naming pattern
-if [[ -z "$CLUSTER_NAME" || -z "$VPC_ID" ]]; then
-    echo -e "${YELLOW}🔍 Terraform stuck - hunting resources by pattern...${NC}"
-    CLUSTER_NAME=$(aws eks list-clusters --region eu-central-1 --query "clusters[?contains(@, 'eshop-1763393223')]" --output text | head -1 || echo "")
-    VPC_ID=$(aws ec2 describe-vpcs --region eu-central-1 --filters "Name=tag:Name,Values=*eshop-1763393223*" --query "Vpcs[0].VpcId" --output text 2>/dev/null | head -1 || echo "")
-fi
-
-echo "🎯 Target Resources:"
-echo "  • EKS Cluster: ${CLUSTER_NAME:-'Not found'}"
-echo "  • VPC: ${VPC_ID:-'Searching...'}"
-echo ""
-
-# ============================================================================
-# INSTANT DESTRUCTION SEQUENCE
-# ============================================================================
-
-# Phase 1: Kubernetes Cleanup (prevents hanging)
-echo -e "${RED}💥 Phase 1: Instant Kubernetes Cleanup${NC}"
-if [[ -n "$CLUSTER_NAME" ]] && command -v kubectl >/dev/null; then
-    echo "Updating kubeconfig..."
-    timeout 30 aws eks update-kubeconfig --region eu-central-1 --name "$CLUSTER_NAME" || true
-    
-    echo "Nuking all Kubernetes resources..."
-    # Delete everything in parallel with short timeouts
-    timeout 30 kubectl delete all --all-namespaces --timeout=20s >/dev/null 2>&1 || true
-    timeout 30 kubectl delete pvc --all-namespaces --timeout=20s >/dev/null 2>&1 || true
-    timeout 30 kubectl delete pv --timeout=20s >/dev/null 2>&1 || true
-    timeout 30 kubectl delete ingress --all-namespaces --timeout=20s >/dev/null 2>&1 || true
-    timeout 30 kubectl delete svc --all-namespaces --field-selector spec.type=LoadBalancer --timeout=20s >/dev/null 2>&1 || true
-    
-    echo "✅ Kubernetes nuked"
-fi
-
-# Phase 2: EKS Destruction
-echo -e "${RED}💥 Phase 2: EKS Instant Destruction${NC}"
-if [[ -n "$CLUSTER_NAME" ]]; then
-    echo "Destroying EKS cluster: $CLUSTER_NAME"
-    
-    # Delete all node groups first (parallel)
-    aws eks list-nodegroups --cluster-name "$CLUSTER_NAME" --region eu-central-1 --query 'nodegroups[]' --output text 2>/dev/null | \
-    xargs -r -P 5 -I {} aws eks delete-nodegroup --cluster-name "$CLUSTER_NAME" --nodegroup-name {} --region eu-central-1 >/dev/null 2>&1 || true
-    
-    # Delete the cluster
-    aws eks delete-cluster --name "$CLUSTER_NAME" --region eu-central-1 >/dev/null 2>&1 || true
-    echo "✅ EKS deletion initiated"
-else
-    echo "No EKS cluster found"
-fi
-
-# Phase 3: RDS Instant Destruction
-echo -e "${RED}💥 Phase 3: RDS Instant Destruction${NC}"
-echo "Finding and destroying RDS instances..."
-aws rds describe-db-instances --region eu-central-1 --query "DBInstances[?contains(DBInstanceIdentifier, 'eshop-1763393223')].DBInstanceIdentifier" --output text 2>/dev/null | \
-xargs -r -P 3 -I {} aws rds delete-db-instance --db-instance-identifier {} --region eu-central-1 --skip-final-snapshot >/dev/null 2>&1 || true
-echo "✅ RDS destruction initiated"
-
-# Phase 4: ElastiCache Instant Destruction  
-echo -e "${RED}💥 Phase 4: ElastiCache Instant Destruction${NC}"
-echo "Finding and destroying ElastiCache clusters..."
-aws elasticache describe-cache-clusters --region eu-central-1 --query "CacheClusters[?contains(CacheClusterId, 'eshop-1763393223')].CacheClusterId" --output text 2>/dev/null | \
-xargs -r -P 3 -I {} aws elasticache delete-cache-cluster --cache-cluster-id {} --region eu-central-1 >/dev/null 2>&1 || true
-echo "✅ ElastiCache destruction initiated"
-
-# Phase 5: ECR Cleanup
-echo -e "${RED}💥 Phase 5: ECR Instant Cleanup${NC}"
-echo "Cleaning ECR repositories..."
-
-# Get ECR repositories and delete them one by one
-ECR_REPOS=$(aws ecr describe-repositories --region eu-central-1 --query "repositories[?contains(repositoryName, 'eshop')].repositoryName" --output text 2>/dev/null || echo "")
-if [[ -n "$ECR_REPOS" ]]; then
-    for REPO in $ECR_REPOS; do
-        echo "  🗑️ Deleting ECR repo: $REPO"
-        aws ecr delete-repository --repository-name "$REPO" --region eu-central-1 --force >/dev/null 2>&1 || true
-    done
-fi
-echo "✅ ECR cleaned"
-
-# Phase 6: Wait and VPC Destruction
-echo -e "${RED}💥 Phase 6: VPC Destruction (after dependencies)${NC}"
-echo "Waiting for main resources to be deleted..."
-
-# Wait for EKS cluster to be deleted
-if [[ -n "$CLUSTER_NAME" ]]; then
-    echo "  ⏳ Waiting for EKS cluster deletion..."
-    WAIT_TIME=0
-    while [[ $WAIT_TIME -lt 600 ]]; do  # Max 10 minutes
-        if ! aws eks describe-cluster --name "$CLUSTER_NAME" --region eu-central-1 >/dev/null 2>&1; then
-            echo "  ✅ EKS cluster deleted!"
-            break
+if [[ -f /tmp/eshop-aspire.pid ]]; then
+    ASPIRE_PID=$(cat /tmp/eshop-aspire.pid)
+    if kill -0 "$ASPIRE_PID" 2>/dev/null; then
+        echo "  🛑 Stopping Aspire process (PID: $ASPIRE_PID)..."
+        kill "$ASPIRE_PID"
+        sleep 2
+        
+        # Force kill falls noch aktiv
+        if kill -0 "$ASPIRE_PID" 2>/dev/null; then
+            echo "  ⚠️  Force killing process..."
+            kill -9 "$ASPIRE_PID"
         fi
-        echo "  ⏳ EKS still deleting... ($WAIT_TIME/600s)"
-        sleep 30
-        WAIT_TIME=$((WAIT_TIME + 30))
-    done
-fi
-
-# Wait for RDS to be deleted  
-RDS_INSTANCE=$(aws rds describe-db-instances --region eu-central-1 --query "DBInstances[?contains(DBInstanceIdentifier, 'eshop')].DBInstanceIdentifier" --output text 2>/dev/null || echo "")
-if [[ -n "$RDS_INSTANCE" ]]; then
-    echo "  ⏳ Waiting for RDS deletion..."
-    WAIT_TIME=0
-    while [[ $WAIT_TIME -lt 900 ]]; do  # Max 15 minutes
-        if ! aws rds describe-db-instances --db-instance-identifier "$RDS_INSTANCE" --region eu-central-1 >/dev/null 2>&1; then
-            echo "  ✅ RDS deleted!"
-            break
-        fi
-        echo "  ⏳ RDS still deleting... ($WAIT_TIME/900s)"
-        sleep 30
-        WAIT_TIME=$((WAIT_TIME + 30))
-    done
-fi
-
-echo "  ✅ Main resources cleanup wait completed"
-
-if [[ -n "$VPC_ID" ]]; then
-    echo "Destroying VPC infrastructure: $VPC_ID"
-    
-    # Delete Load Balancers first
-    aws elbv2 describe-load-balancers --region eu-central-1 --query "LoadBalancers[?VpcId=='$VPC_ID'].LoadBalancerArn" --output text 2>/dev/null | \
-    xargs -r -P 3 -I {} aws elbv2 delete-load-balancer --load-balancer-arn {} --region eu-central-1 >/dev/null 2>&1 || true
-    
-    # Delete NAT Gateways
-    aws ec2 describe-nat-gateways --region eu-central-1 --filter "Name=vpc-id,Values=$VPC_ID" --query "NatGateways[?State=='available'].NatGatewayId" --output text 2>/dev/null | \
-    xargs -r -P 3 -I {} aws ec2 delete-nat-gateway --nat-gateway-id {} --region eu-central-1 >/dev/null 2>&1 || true
-    
-    sleep 30
-    
-    # Delete Security Groups (except default)
-    aws ec2 describe-security-groups --region eu-central-1 --filters "Name=vpc-id,Values=$VPC_ID" --query "SecurityGroups[?GroupName!='default'].GroupId" --output text 2>/dev/null | \
-    xargs -r -P 5 -I {} aws ec2 delete-security-group --group-id {} --region eu-central-1 >/dev/null 2>&1 || true
-    
-    # Delete Subnets
-    aws ec2 describe-subnets --region eu-central-1 --filters "Name=vpc-id,Values=$VPC_ID" --query "Subnets[].SubnetId" --output text 2>/dev/null | \
-    xargs -r -P 5 -I {} aws ec2 delete-subnet --subnet-id {} --region eu-central-1 >/dev/null 2>&1 || true
-    
-    # Delete Internet Gateway
-    aws ec2 describe-internet-gateways --region eu-central-1 --filters "Name=attachment.vpc-id,Values=$VPC_ID" --query "InternetGateways[].InternetGatewayId" --output text 2>/dev/null | \
-    xargs -r -I {} bash -c 'aws ec2 detach-internet-gateway --internet-gateway-id {} --vpc-id '$VPC_ID' --region eu-central-1 >/dev/null 2>&1; aws ec2 delete-internet-gateway --internet-gateway-id {} --region eu-central-1 >/dev/null 2>&1' || true
-    
-    # Delete Route Tables (except main)
-    aws ec2 describe-route-tables --region eu-central-1 --filters "Name=vpc-id,Values=$VPC_ID" --query "RouteTables[?Associations[0].Main!=\`true\`].RouteTableId" --output text 2>/dev/null | \
-    xargs -r -P 5 -I {} aws ec2 delete-route-table --route-table-id {} --region eu-central-1 >/dev/null 2>&1 || true
-    
-    sleep 15
-    
-    # Finally delete VPC
-    aws ec2 delete-vpc --vpc-id "$VPC_ID" --region eu-central-1 >/dev/null 2>&1 || true
-    
-    echo "✅ VPC destruction initiated"
+        echo "  ✅ Aspire process stopped"
+    else
+        echo "  ℹ️  Process not running"
+    fi
+    rm -f /tmp/eshop-aspire.pid
 else
-    echo "No VPC found or already deleted"
+    echo "  ℹ️  No PID file found. Searching for eShop.AppHost processes..."
+    if pgrep -f "eShop.AppHost" > /dev/null; then
+        pkill -f "eShop.AppHost" || true
+        sleep 1
+        echo "  ✅ eShop.AppHost processes terminated"
+    else
+        echo "  ℹ️  No eShop processes found"
+    fi
 fi
 
-# Phase 7: Complete AWS Cleanup (ECR, S3, DynamoDB)
-echo -e "${RED}💥 Phase 7: Complete AWS Resource Cleanup${NC}"
-
-# 7.1 ECR Repository Cleanup
-echo "7.1 Destroying ECR repositories..."
-ECR_REPOS=$(aws ecr describe-repositories --region eu-central-1 --query "repositories[?contains(repositoryName, 'eshop')].repositoryName" --output text 2>/dev/null || echo "")
-if [[ -n "$ECR_REPOS" ]]; then
-    for REPO in $ECR_REPOS; do
-        echo "  🗑️ Deleting ECR repo: $REPO"
-        aws ecr delete-repository --repository-name "$REPO" --region eu-central-1 --force >/dev/null 2>&1 || true
-    done
+# 2. Cleanup Logs
+echo -e "${YELLOW}📋 Step 2: Cleanup Logs${NC}"
+if [[ -f /tmp/eshop-aspire.log ]]; then
+    rm -f /tmp/eshop-aspire.log
+    echo "  ✅ Log file removed"
+else
+    echo "  ℹ️  No log file found"
 fi
 
-# 7.2 S3 Buckets Complete Cleanup (including versioned objects)
-echo "7.2 Destroying S3 buckets (including all versions)..."
-aws s3 ls | grep eshop | awk '{print $3}' | while read bucket; do
-    if [[ ! -z "$bucket" ]]; then
-        echo "Cleaning bucket: $bucket"
-        
-        # Delete all object versions
-        aws s3api list-object-versions --bucket "$bucket" --query 'Versions[].{Key:Key,VersionId:VersionId}' --output text 2>/dev/null | \
-        while read key version; do
-            if [[ ! -z "$key" && ! -z "$version" ]]; then
-                aws s3api delete-object --bucket "$bucket" --key "$key" --version-id "$version" >/dev/null 2>&1 || true
-            fi
-        done
-        
-        # Delete all delete markers
-        aws s3api list-object-versions --bucket "$bucket" --query 'DeleteMarkers[].{Key:Key,VersionId:VersionId}' --output text 2>/dev/null | \
-        while read key version; do
-            if [[ ! -z "$key" && ! -z "$version" ]]; then
-                aws s3api delete-object --bucket "$bucket" --key "$key" --version-id "$version" >/dev/null 2>&1 || true
-            fi
-        done
-        
-        # Delete the bucket
-        aws s3api delete-bucket --bucket "$bucket" --region eu-central-1 >/dev/null 2>&1 || true
+# 3. Verify Port Cleanup
+echo -e "${YELLOW}📋 Step 3: Verify Port Cleanup${NC}"
+echo "  ℹ️  Checking if ports are free..."
+
+for port in 5000 15000 5432 6379 5672; do
+    if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
+        echo "  ⚠️  Port $port is still in use"
+    else
+        echo "  ✅ Port $port is free"
     fi
 done
 
-# 7.3 DynamoDB Tables Cleanup
-echo "7.3 Destroying DynamoDB tables..."
-aws dynamodb list-tables --region eu-central-1 --query "TableNames[?contains(@, 'eshop')]" --output text 2>/dev/null | \
-xargs -r -P 3 -I {} aws dynamodb delete-table --table-name {} --region eu-central-1 >/dev/null 2>&1 || true
-
-# 7.4 Terraform State Wipe
-echo "7.4 Wiping terraform state..."
-if command -v terraform >/dev/null 2>&1; then
-    timeout 30 terraform state list 2>/dev/null | head -50 | xargs -r -P 10 -I {} timeout 10 terraform state rm {} >/dev/null 2>&1 || true
+# 4. Cleanup Docker Containers (if running)
+echo -e "${YELLOW}📋 Step 4: Docker Container Cleanup (Optional)${NC}"
+if command -v docker >/dev/null 2>&1; then
+    ASPIRE_CONTAINERS=$(docker ps -a -q -f label=aspire 2>/dev/null || echo "")
+    if [[ -n "$ASPIRE_CONTAINERS" ]]; then
+        echo "  🐳 Stopping Aspire Docker containers..."
+        echo "$ASPIRE_CONTAINERS" | xargs -r docker stop 2>/dev/null || true
+        echo "$ASPIRE_CONTAINERS" | xargs -r docker rm 2>/dev/null || true
+        echo "  ✅ Docker containers cleaned up"
+    else
+        echo "  ℹ️  No Aspire containers found"
+    fi
+else
+    echo "  ℹ️  Docker not installed"
 fi
 
-# Remove local files
-rm -rf .terraform .terraform.lock.hcl tfplan terraform.tfstate* *.tfplan 2>/dev/null || true
+# 5. Optional: Clean build artifacts
+echo -e "${YELLOW}📋 Step 5: Build Artifacts (Optional)${NC}"
+echo "  💡 To clean build artifacts, run:"
+echo "     dotnet clean ../src/eShop.sln"
+echo "     find ../src -type d -name 'bin' -o -name 'obj' | xargs rm -rf"
 
-echo "✅ Complete AWS cleanup finished"
-
+# 6. Cleanup Summary
 echo ""
-echo -e "${GREEN}${BOLD}⚡ INSTANT TOTAL ANNIHILATION COMPLETED! ⚡${NC}"
-echo -e "${GREEN}✅ AWS infrastructure: 100% DESTROYED${NC}"
-echo -e "${GREEN}✅ ECR repositories: DESTROYED${NC}"
-echo -e "${GREEN}✅ S3 buckets (all versions): DESTROYED${NC}"
-echo -e "${GREEN}✅ DynamoDB tables: DESTROYED${NC}"
-echo -e "${GREEN}✅ Cost: $0.00/hour${NC}"  
-echo -e "${GREEN}✅ Speed: < 3 minutes${NC}"
+echo -e "${GREEN}🎉 ===============================================${NC}"
+echo -e "${GREEN}✅ eShop Cleanup Complete!${NC}"
+echo -e "${GREEN}===============================================${NC}"
 echo ""
-echo -e "${BLUE}💡 What was destroyed:${NC}"
-echo "  • VPC and all networking components"
-echo "  • EKS cluster and node groups"
-echo "  • RDS database instances"
-echo "  • ElastiCache clusters"
-echo "  • Load Balancers (Classic, ALB, NLB)"
-echo "  • ECR repositories with all images"
-echo "  • S3 buckets with all object versions"
-echo "  • DynamoDB lock tables"
-echo "  • Security groups, subnets, gateways"
-echo "  • Terraform state files and locks"
+echo -e "${GREEN}✅ Cleanup Actions:${NC}"
+echo "  ✓ Aspire process stopped"
+echo "  ✓ Log files cleaned up"
+echo "  ✓ Ports verified"
+echo "  ✓ Docker containers cleaned up"
 echo ""
-echo -e "${BLUE}🔥 Efficiency achieved:${NC}"
-echo "  • Bypassed ALL Terraform locks"
-echo "  • Used direct AWS CLI commands"
-echo "  • Parallel destruction for maximum speed"
-echo "  • Zero dependency issues"
-echo "  • 100% cost elimination"
+echo -e "${YELLOW}📝 Next Steps:${NC}"
+echo "  • To restart: ./deploy-v2.sh"
+echo "  • To see logs: tail -f /tmp/eshop-aspire.log"
+echo "  • To clean build: dotnet clean ../src/eShop.sln"
 echo ""
-echo -e "${CYAN}💰 Monthly savings: $150-200 → $0 (100% reduction)${NC}"
-
-cd ../../../
+echo -e "${GREEN}🧹 All cleanup completed!${NC}"
