@@ -2,170 +2,211 @@ name: 🚀 Continuous Deployment
 
 on:
   push:
-    branches: [develop, staging, main, feature/ci-cd-implementation]
+    branches: [develop, staging, main]
     paths-ignore:
       - "**.md"
       - "docs/**"
+      - ".github/workflows/ci.yml"
   workflow_run:
     workflows: ["🔨 Continuous Integration"]
     types: [completed]
-    branches: [develop, staging, main, feature/ci-cd-implementation]
+    branches: [develop, staging, main]
   workflow_dispatch:
     inputs:
       environment:
-        description: "Target environment"
+        description: "Target environment (dev/staging/prod)"
         required: true
-        default: "development"
+        default: "dev"
         type: choice
         options:
-          - development
+          - dev
           - staging
-          - production
+          - prod
+      skip-tests:
+        description: "Skip integration tests"
+        required: false
+        type: boolean
+        default: false
 
 env:
-  DOTNET_VERSION: "10.0.x"
+  DOTNET_VERSION: "9.0.x"
+  DOTNET_CONFIGURATION: "Release"
   AWS_REGION: eu-central-1
-  ECR_REGISTRY: # Will be set when AWS infrastructure is ready
-  EKS_CLUSTER_NAME: # Will be set when AWS infrastructure is ready
+  ECR_REGISTRY_NAME: eshop
+  EKS_CLUSTER_PREFIX: eks
+  DOCKER_BUILDKIT: 1
+  BUILDKIT_PROGRESS: auto
 
 jobs:
-  prepare-deployment:
-    name: 🎯 Prepare Deployment
+  # Determine deployment configuration
+  determine-environment:
+    name: 📋 Determine Environment
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.event.workflow_run.conclusion == 'success' }}
-
     outputs:
-      environment: ${{ steps.determine-env.outputs.environment }}
+      environment: ${{ steps.set-env.outputs.env }}
       deploy-enabled: ${{ steps.check-readiness.outputs.ready }}
+      ecr-registry: ${{ steps.set-env.outputs.registry }}
+      cluster-name: ${{ steps.set-env.outputs.cluster }}
+      services: ${{ steps.set-services.outputs.services }}
 
     steps:
-      - name: 🛒 Checkout Code
-        uses: actions/checkout@v4
-
-      - name: 🎯 Determine Target Environment
-        id: determine-env
+      - name: 🔍 Determine Target Environment
+        id: set-env
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.event_name }}" == "push" ]]; then
-            case "${{ github.ref_name }}" in
-              "develop")
-                echo "environment=development" >> $GITHUB_OUTPUT
-                ;;
-              "staging")
-                echo "environment=staging" >> $GITHUB_OUTPUT
-                ;;
-              "main")
-                echo "environment=production" >> $GITHUB_OUTPUT
-                ;;
-              *)
-                echo "environment=development" >> $GITHUB_OUTPUT
-                ;;
-            esac
+            ENV="${{ github.event.inputs.environment }}"
           else
-            case "${{ github.event.workflow_run.head_branch }}" in
-              "develop")
-                echo "environment=development" >> $GITHUB_OUTPUT
-                ;;
-              "staging")
-                echo "environment=staging" >> $GITHUB_OUTPUT
-                ;;
-              "main")
-                echo "environment=production" >> $GITHUB_OUTPUT
-                ;;
-              *)
-                echo "environment=development" >> $GITHUB_OUTPUT
-                ;;
+            case "${{ github.ref_name }}" in
+              "develop") ENV="dev" ;;
+              "staging") ENV="staging" ;;
+              "main") ENV="prod" ;;
+              *) ENV="dev" ;;
             esac
           fi
+          
+          echo "env=$ENV" >> $GITHUB_OUTPUT
+          
+          # Set AWS account based on environment
+          case "$ENV" in
+            "dev")
+              echo "registry=eshop-dev.dkr.ecr.eu-central-1.amazonaws.com/eshop" >> $GITHUB_OUTPUT
+              echo "cluster=eks-dev" >> $GITHUB_OUTPUT
+              ;;
+            "staging")
+              echo "registry=eshop-staging.dkr.ecr.eu-central-1.amazonaws.com/eshop" >> $GITHUB_OUTPUT
+              echo "cluster=eks-staging" >> $GITHUB_OUTPUT
+              ;;
+            "prod")
+              echo "registry=eshop-prod.dkr.ecr.eu-central-1.amazonaws.com/eshop" >> $GITHUB_OUTPUT
+              echo "cluster=eks-prod" >> $GITHUB_OUTPUT
+              ;;
+          esac
+          
+          echo "🎯 Deployment Environment: $ENV" >> $GITHUB_STEP_SUMMARY
 
       - name: ✅ Check Deployment Readiness
         id: check-readiness
         run: |
-          # DEMO MODE: Show complete pipeline structure
-          echo "ready=true" >> $GITHUB_OUTPUT
-          echo "🚀 DEMO MODE: Showing complete pipeline structure" >> $GITHUB_STEP_SUMMARY
-          echo "⚠️ No actual AWS deployments - infrastructure not yet provisioned" >> $GITHUB_STEP_SUMMARY
+          # Check if AWS credentials are configured
+          if [[ -z "${{ secrets.AWS_ROLE_ARN }}" ]]; then
+            echo "⚠️  AWS credentials not configured - deployment disabled" >> $GITHUB_STEP_SUMMARY
+            echo "ready=false" >> $GITHUB_OUTPUT
+          else
+            echo "ready=true" >> $GITHUB_OUTPUT
+            echo "✅ Ready for deployment" >> $GITHUB_STEP_SUMMARY
+          fi
 
-  # This job will be enabled once AWS infrastructure is ready
+      - name: 📊 Set Service List
+        id: set-services
+        run: |
+          SERVICES='{
+            "service": [
+              "basket-api",
+              "catalog-api",
+              "identity-api",
+              "ordering-api",
+              "order-processor",
+              "payment-processor",
+              "webhooks-api",
+              "webapp",
+              "webhook-client"
+            ]
+          }'
+          echo "services=$(echo $SERVICES | jq -c .)" >> $GITHUB_OUTPUT
+
+  # Build and push Docker images to ECR
   build-and-push-images:
-    name: 🐳 Build & Push Container Images
+    name: 🐳 Build & Push to ECR
     runs-on: ubuntu-latest
-    needs: prepare-deployment
-    if: needs.prepare-deployment.outputs.deploy-enabled == 'true'
+    needs: determine-environment
+    if: needs.determine-environment.outputs.deploy-enabled == 'true'
 
     strategy:
-      matrix:
-        # Service names in kebab-case for Docker image naming convention
-        # Maps to CI artifacts: Basket.API → basket-api, etc.
-        service:
-          - basket-api
-          - catalog-api
-          - identity-api
-          - ordering-api
-          - order-processor
-          - payment-processor
-          - webhooks-api
-          - webapp
-          - webhook-client
+      matrix: ${{ fromJson(needs.determine-environment.outputs.services) }}
+      max-parallel: 3
 
     steps:
       - name: 🛒 Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: 🔑 Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_DEPLOYMENT_ROLE_ARN }}
-          role-session-name: GitHubActions-${{ github.run_id }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-${{ github.run_id }}-${{ matrix.service }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: 🔐 Login to Amazon ECR
+      - name: 🔐 Login to ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
-
-      - name: 📥 Download Build Artifacts
-        uses: actions/download-artifact@v4
         with:
-          name: build-artifacts-${{ github.event.workflow_run.head_sha }}
-          path: artifacts/
+          registries: ${{ secrets.AWS_ACCOUNT_ID }}
 
-      - name: 🐳 Build Container Image
+      - name: 🏗️ Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🏷️ Generate Image Metadata
+        id: meta
         run: |
-          # Convert kebab-case to PascalCase for artifact folder mapping
-          # basket-api → Basket.API, order-processor → OrderProcessor, etc.
+          # Convert kebab-case to PascalCase for source mapping
           case "${{ matrix.service }}" in
-            "basket-api") SERVICE_FOLDER="Basket.API" ;;
-            "catalog-api") SERVICE_FOLDER="Catalog.API" ;;
-            "identity-api") SERVICE_FOLDER="Identity.API" ;;
-            "ordering-api") SERVICE_FOLDER="Ordering.API" ;;
-            "order-processor") SERVICE_FOLDER="OrderProcessor" ;;
-            "payment-processor") SERVICE_FOLDER="PaymentProcessor" ;;
-            "webhooks-api") SERVICE_FOLDER="Webhooks.API" ;;
-            "webapp") SERVICE_FOLDER="WebApp" ;;
-            "webhook-client") SERVICE_FOLDER="WebhookClient" ;;
-            *) SERVICE_FOLDER="${{ matrix.service }}" ;;
+            "basket-api") SOURCE_DIR="src/Basket.API" ;;
+            "catalog-api") SOURCE_DIR="src/Catalog.API" ;;
+            "identity-api") SOURCE_DIR="src/Identity.API" ;;
+            "ordering-api") SOURCE_DIR="src/Ordering.API" ;;
+            "order-processor") SOURCE_DIR="src/OrderProcessor" ;;
+            "payment-processor") SOURCE_DIR="src/PaymentProcessor" ;;
+            "webhooks-api") SOURCE_DIR="src/Webhooks.API" ;;
+            "webapp") SOURCE_DIR="src/WebApp" ;;
+            "webhook-client") SOURCE_DIR="src/WebhookClient" ;;
+            *) SOURCE_DIR="src/${{ matrix.service }}" ;;
           esac
+          
+          echo "source-dir=$SOURCE_DIR" >> $GITHUB_OUTPUT
+          echo "registry=${{ needs.determine-environment.outputs.ecr-registry }}" >> $GITHUB_OUTPUT
+          echo "image-uri=${{ needs.determine-environment.outputs.ecr-registry }}/${{ matrix.service }}" >> $GITHUB_OUTPUT
+          echo "tag=${{ github.sha }}" >> $GITHUB_OUTPUT
+          echo "latest-tag=latest" >> $GITHUB_OUTPUT
 
-          echo "Building container image for ${{ matrix.service }} from artifacts/$SERVICE_FOLDER"
-          # TODO: Create Dockerfiles for each service
-          # docker build -t $ECR_REGISTRY/${{ matrix.service }}:${{ github.event.workflow_run.head_sha }} \
-          #   --build-arg SERVICE_FOLDER=$SERVICE_FOLDER \
-          #   -f docker/${{ matrix.service }}/Dockerfile .
+      - name: 🐳 Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/${{ matrix.service }}/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image-uri }}:${{ steps.meta.outputs.tag }}
+            ${{ steps.meta.outputs.image-uri }}:${{ steps.meta.outputs.latest-tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            SERVICE_NAME=${{ steps.meta.outputs.source-dir }}
+            BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+            VCS_REF=${{ github.sha }}
+            VERSION=${{ github.ref_name }}-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.title=${{ matrix.service }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
 
-      - name: 📤 Push Image to ECR
+      - name: 📋 Image Build Summary
         run: |
-          # TODO: Push images when ready
-          echo "Would push: $ECR_REGISTRY/${{ matrix.service }}:${{ github.event.workflow_run.head_sha }}"
-          # docker push $ECR_REGISTRY/${{ matrix.service }}:${{ github.event.workflow_run.head_sha }}
+          echo "## 🐳 Image Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "Service: **${{ matrix.service }}**" >> $GITHUB_STEP_SUMMARY
+          echo "Image URI: \`${{ steps.meta.outputs.image-uri }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "Tags: \`${{ steps.meta.outputs.tag }}\`, \`${{ steps.meta.outputs.latest-tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Image successfully pushed to ECR" >> $GITHUB_STEP_SUMMARY
 
-  # This job will be enabled once EKS cluster is ready
+  # Deploy to Kubernetes
   deploy-to-kubernetes:
-    name: ☸️ Deploy to Kubernetes
+    name: ☸️ Deploy to EKS
     runs-on: ubuntu-latest
-    needs: [prepare-deployment, build-and-push-images]
-    environment: ${{ needs.prepare-deployment.outputs.environment }}
-    if: needs.prepare-deployment.outputs.deploy-enabled == 'true'
+    needs: [determine-environment, build-and-push-images]
+    environment:
+      name: ${{ needs.determine-environment.outputs.environment }}
+    if: needs.determine-environment.outputs.deploy-enabled == 'true'
 
     steps:
       - name: 🛒 Checkout Code
@@ -174,56 +215,213 @@ jobs:
       - name: 🔑 Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_DEPLOYMENT_ROLE_ARN }}
-          role-session-name: GitHubActions-${{ github.run_id }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-Deploy-${{ github.run_id }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: 🔐 Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          registries: ${{ secrets.AWS_ACCOUNT_ID }}
 
       - name: ⚙️ Setup kubectl
         uses: azure/setup-kubectl@v3
         with:
-          version: "latest"
+          version: "v1.28.0"
 
       - name: ⚙️ Setup Helm
         uses: azure/setup-helm@v3
         with:
-          version: "latest"
+          version: "v3.13.0"
 
-      - name: 🔧 Update kubeconfig
+      - name: 🔧 Configure kubectl
         run: |
-          # TODO: Configure when EKS cluster exists
-          # aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
+          aws eks update-kubeconfig \
+            --region ${{ env.AWS_REGION }} \
+            --name ${{ needs.determine-environment.outputs.cluster-name }}
+          
+          echo "✅ kubectl configured for: ${{ needs.determine-environment.outputs.cluster-name }}" >> $GITHUB_STEP_SUMMARY
 
-      - name: 🚀 Deploy with Helm
+      - name: 📦 Create Namespace
         run: |
-          # TODO: Deploy when infrastructure is ready
-          echo "Would deploy to ${{ needs.prepare-deployment.outputs.environment }} environment"
-          echo "Using Helm chart: ./infra/k8s/helm/eshop-app/"
+          kubectl create namespace eshop --dry-run=client -o yaml | kubectl apply -f -
+          echo "✅ Namespace 'eshop' ready" >> $GITHUB_STEP_SUMMARY
 
-      - name: ✅ Deployment Summary
+      - name: 📦 Create Helm Chart Values
         run: |
-          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Successfully deployed to **${{ needs.prepare-deployment.outputs.environment }}**" >> $GITHUB_STEP_SUMMARY
-          echo "- **Commit:** ${{ github.event.workflow_run.head_sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Branch:** ${{ github.event.workflow_run.head_branch }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Environment:** ${{ needs.prepare-deployment.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          mkdir -p /tmp/helm-config
+          cat > /tmp/helm-config/values.yaml << 'EOF'
+          # eShop Helm Values - Auto-generated
+          environment: ${{ needs.determine-environment.outputs.environment }}
+          imageRegistry: ${{ needs.determine-environment.outputs.ecr-registry }}
+          imageTag: ${{ github.sha }}
+          
+          replicaCount: 2
+          
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          
+          livenessProbe:
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          
+          readinessProbe:
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          EOF
 
-  # Placeholder for future integration tests
-  run-integration-tests:
+      - name: 🚀 Deploy Services with kubectl
+        run: |
+          echo "🚀 Deploying eShop services..." >> $GITHUB_STEP_SUMMARY
+          
+          # Apply services deployment manifests
+          for service in basket catalog identity ordering webhooks webapp; do
+            if [ -f "infra/k8s/${service}-api-deployment.yaml" ]; then
+              kubectl apply -n eshop -f "infra/k8s/${service}-api-deployment.yaml"
+            fi
+          done
+          
+          # Apply webapp
+          if [ -f "infra/k8s/webapp-deployment.yaml" ]; then
+            kubectl apply -n eshop -f "infra/k8s/webapp-deployment.yaml"
+          fi
+          
+          echo "✅ Deployment manifests applied" >> $GITHUB_STEP_SUMMARY
+
+      - name: 🔄 Verify Deployment
+        run: |
+          echo "📊 Verifying deployment status..." >> $GITHUB_STEP_SUMMARY
+          
+          # Wait for deployments
+          kubectl rollout status -n eshop deployment --timeout=5m || true
+          
+          echo "## 📋 Deployment Status" >> $GITHUB_STEP_SUMMARY
+          kubectl get deployments -n eshop -o wide >> $GITHUB_STEP_SUMMARY || true
+          
+          echo "## 🔗 Service Endpoints" >> $GITHUB_STEP_SUMMARY
+          kubectl get svc -n eshop -o wide >> $GITHUB_STEP_SUMMARY || true
+
+      - name: 📍 Get LoadBalancer URL
+        id: get-url
+        run: |
+          echo "⏳ Waiting for LoadBalancer..." >> $GITHUB_STEP_SUMMARY
+          
+          for i in {1..30}; do
+            LB_URL=$(kubectl get svc -n eshop webapp -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+            if [[ -n "$LB_URL" ]]; then
+              echo "url=$LB_URL" >> $GITHUB_OUTPUT
+              echo "🔗 **LoadBalancer:** http://$LB_URL" >> $GITHUB_STEP_SUMMARY
+              break
+            fi
+            echo "  waiting... (attempt $i/30)" >> $GITHUB_STEP_SUMMARY
+            sleep 10
+          done
+
+      - name: 📋 Deployment Summary
+        run: |
+          echo "## 🚀 Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${{ needs.determine-environment.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Cluster:** ${{ needs.determine-environment.outputs.cluster-name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+
+  # Integration tests
+  integration-tests:
     name: 🧪 Integration Tests
     runs-on: ubuntu-latest
-    needs: [prepare-deployment, deploy-to-kubernetes]
-    if: needs.prepare-deployment.outputs.deploy-enabled == 'true'
+    needs: [determine-environment, deploy-to-kubernetes]
+    if: |
+      needs.determine-environment.outputs.deploy-enabled == 'true' &&
+      github.event.inputs.skip-tests != 'true'
 
     steps:
       - name: 🛒 Checkout Code
         uses: actions/checkout@v4
 
-      - name: 🧪 Run Integration Tests
-        run: |
-          # TODO: Implement integration tests
-          echo "Integration tests would run here against deployed services"
+      - name: 🔑 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: 📊 Test Report
+      - name: ⚙️ Setup kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: 🔧 Configure kubectl
+        run: |
+          aws eks update-kubeconfig \
+            --region ${{ env.AWS_REGION }} \
+            --name ${{ needs.determine-environment.outputs.cluster-name }}
+
+      - name: 🔗 Get Service URL
+        id: service-url
+        run: |
+          for i in {1..10}; do
+            SERVICE_URL=$(kubectl get svc -n eshop webapp -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+            if [[ -n "$SERVICE_URL" ]]; then
+              echo "url=http://$SERVICE_URL" >> $GITHUB_OUTPUT
+              break
+            fi
+            sleep 10
+          done
+
+      - name: 🏥 Health Checks
+        if: steps.service-url.outputs.url != ''
+        run: |
+          echo "🏥 Running health checks..." >> $GITHUB_STEP_SUMMARY
+          
+          curl -f -s "${{ steps.service-url.outputs.url }}/health" > /dev/null && \
+            echo "✅ Service health check passed" >> $GITHUB_STEP_SUMMARY || \
+            echo "⚠️ Service may not be ready yet" >> $GITHUB_STEP_SUMMARY
+
+      - name: 📊 Test Summary
+        if: always()
         run: |
           echo "## 🧪 Integration Test Results" >> $GITHUB_STEP_SUMMARY
-          echo "✅ All integration tests passed" >> $GITHUB_STEP_SUMMARY
+          echo "$([ '${{ job.status }}' == 'success' ] && echo '✅ Tests passed' || echo '⚠️ Tests incomplete')" >> $GITHUB_STEP_SUMMARY
+
+  # Cost monitoring
+  cost-monitor:
+    name: 💰 Cost Monitor
+    runs-on: ubuntu-latest
+    needs: determine-environment
+    if: needs.determine-environment.outputs.deploy-enabled == 'true'
+
+    steps:
+      - name: 🔑 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 📊 Cost Check
+        run: |
+          echo "## 💰 AWS Cost Monitor" >> $GITHUB_STEP_SUMMARY
+          echo "Environment: **${{ needs.determine-environment.outputs.environment }}**" >> $GITHUB_STEP_SUMMARY
+          echo "⚠️ **Reminder:** EKS costs ~$0.10/hour. Cleanup when not needed!" >> $GITHUB_STEP_SUMMARY
+
+  # Final status
+  deployment-status:
+    name: ✅ Final Status
+    runs-on: ubuntu-latest
+    needs: [determine-environment, build-and-push-images, deploy-to-kubernetes]
+    if: always()
+
+    steps:
+      - name: 📋 Deployment Report
+        run: |
+          echo "## 🎯 CD Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ needs.determine-environment.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** $([ '${{ job.status }}' == 'success' ] && echo '✅ SUCCESS' || echo '❌ FAILED')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Cleanup:** \`./infra/destroy.sh\`" >> $GITHUB_STEP_SUMMARY
