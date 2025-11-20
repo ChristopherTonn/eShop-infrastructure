@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# eShop Cleanup Script - AWS EKS Version
-# Terminates all Aspire processes and cleans up local resources
+# eShop Infrastructure Destruction Script - AWS EKS
+# Removes all Kubernetes deployments, services, and cleans up AWS resources
+# Note: Does NOT destroy Terraform infrastructure (databases, VPC, etc.)
 
 set -e
 
@@ -11,97 +12,141 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-echo -e "${YELLOW}🧹 eShop Cleanup - Stopping Aspire Services${NC}"
-echo "==========================================="
+echo -e "${YELLOW}💥 eShop Infrastructure Destruction${NC}"
+echo "========================================"
+echo ""
+echo -e "${RED}WARNING: This will remove all Kubernetes deployments and services!${NC}"
 echo ""
 
-# 1. Stop Aspire Process
-echo -e "${YELLOW}📋 Step 1: Stop Aspire Process${NC}"
+# Configuration
+CLUSTER_NAME="${EKS_CLUSTER_NAME:-eks-dev}"
+AWS_REGION="${AWS_REGION:-eu-central-1}"
+NAMESPACE="default"
 
-if [[ -f /tmp/eshop-aspire.pid ]]; then
-    ASPIRE_PID=$(cat /tmp/eshop-aspire.pid)
-    if kill -0 "$ASPIRE_PID" 2>/dev/null; then
-        echo "  🛑 Stopping Aspire process (PID: $ASPIRE_PID)..."
-        kill "$ASPIRE_PID"
-        sleep 2
+# 1. Verify AWS credentials
+echo -e "${YELLOW}📋 Step 1: Verify AWS Credentials${NC}"
+if ! command -v aws &> /dev/null; then
+    echo -e "${RED}  ❌ AWS CLI not found. Please install AWS CLI.${NC}"
+    exit 1
+fi
+
+if ! aws sts get-caller-identity &> /dev/null; then
+    echo -e "${RED}  ❌ AWS credentials not configured. Please run 'aws configure'.${NC}"
+    exit 1
+fi
+
+echo "  ✅ AWS credentials validated"
+AWS_ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+echo "  ✅ AWS Account: $AWS_ACCOUNT"
+
+# 2. Configure kubectl access
+echo -e "${YELLOW}📋 Step 2: Configure kubectl Access${NC}"
+if ! command -v kubectl &> /dev/null; then
+    echo -e "${RED}  ❌ kubectl not found. Please install kubectl.${NC}"
+    exit 1
+fi
+
+echo "  🔧 Updating kubeconfig for EKS cluster: $CLUSTER_NAME"
+aws eks update-kubeconfig --region $AWS_REGION --name $CLUSTER_NAME --no-verify-ssl
+
+if ! kubectl cluster-info &> /dev/null; then
+    echo -e "${YELLOW}  ⚠️  Cannot connect to cluster. Skipping Kubernetes cleanup.${NC}"
+else
+    echo "  ✅ kubectl configured successfully"
+
+    # 3. Delete all Helm releases
+    echo -e "${YELLOW}📋 Step 3: Delete Helm Releases${NC}"
+    if command -v helm &> /dev/null; then
+        RELEASES=$(helm list --namespace $NAMESPACE --output json | jq -r '.[].name' 2>/dev/null || echo "")
         
-        # Force kill if still active
-        if kill -0 "$ASPIRE_PID" 2>/dev/null; then
-            echo "  ⚠️  Force killing process..."
-            kill -9 "$ASPIRE_PID"
+        if [[ -n "$RELEASES" ]]; then
+            echo "  🗑️  Deleting Helm releases..."
+            echo "$RELEASES" | while read -r release; do
+                echo "    • Deleting release: $release"
+                helm uninstall "$release" --namespace $NAMESPACE || true
+            done
+            echo "  ✅ Helm releases deleted"
+        else
+            echo "  ℹ️  No Helm releases found"
         fi
-        echo "  ✅ Aspire process stopped"
     else
-        echo "  ℹ️  Process not running"
+        echo "  ⚠️  Helm not installed. Skipping Helm cleanup."
     fi
-    rm -f /tmp/eshop-aspire.pid
-else
-    echo "  ℹ️  No PID file found. Searching for eShop.AppHost processes..."
-    if pgrep -f "eShop.AppHost" > /dev/null; then
-        pkill -f "eShop.AppHost" || true
-        sleep 1
-        echo "  ✅ eShop.AppHost processes terminated"
+
+    # 4. Delete Kubernetes deployments
+    echo -e "${YELLOW}📋 Step 4: Delete Kubernetes Deployments${NC}"
+    DEPLOYMENTS=$(kubectl get deployments -n $NAMESPACE -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
+    
+    if [[ -n "$DEPLOYMENTS" ]]; then
+        echo "  🗑️  Deleting deployments..."
+        kubectl delete deployments --all -n $NAMESPACE --grace-period=30
+        echo "  ✅ Deployments deleted"
     else
-        echo "  ℹ️  No eShop processes found"
+        echo "  ℹ️  No deployments found"
+    fi
+
+    # 5. Delete services (excluding kubernetes service)
+    echo -e "${YELLOW}📋 Step 5: Delete Services${NC}"
+    SERVICES=$(kubectl get services -n $NAMESPACE -o jsonpath='{.items[?(@.metadata.name!="kubernetes")].metadata.name}' 2>/dev/null || echo "")
+    
+    if [[ -n "$SERVICES" ]]; then
+        echo "  🗑️  Deleting services..."
+        kubectl delete services --all -n $NAMESPACE
+        echo "  ✅ Services deleted"
+    else
+        echo "  ℹ️  No services found"
+    fi
+
+    # 6. Wait for LoadBalancer cleanup
+    echo -e "${YELLOW}📋 Step 6: Wait for LoadBalancer Cleanup${NC}"
+    echo "  ⏳ Waiting for AWS LoadBalancers to be removed (this may take a minute)..."
+    sleep 30
+    echo "  ✅ LoadBalancers cleanup initiated"
+
+    # 7. Delete persistent volumes
+    echo -e "${YELLOW}📋 Step 7: Delete Persistent Volumes${NC}"
+    PVCs=$(kubectl get pvc -n $NAMESPACE -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
+    
+    if [[ -n "$PVCs" ]]; then
+        echo "  🗑️  Deleting persistent volume claims..."
+        kubectl delete pvc --all -n $NAMESPACE
+        echo "  ✅ PVCs deleted"
+    else
+        echo "  ℹ️  No persistent volumes found"
     fi
 fi
 
-# 2. Cleanup Logs
-echo -e "${YELLOW}📋 Step 2: Cleanup Logs${NC}"
-if [[ -f /tmp/eshop-aspire.log ]]; then
-    rm -f /tmp/eshop-aspire.log
-    echo "  ✅ Log file removed"
-else
-    echo "  ℹ️  No log file found"
-fi
+# 8. Clean up ECR images (optional)
+echo -e "${YELLOW}📋 Step 8: Clean up ECR Images (Optional)${NC}"
+echo "  💡 To delete ECR repositories, run:"
+echo "     aws ecr delete-repository --repository-name eshop-[service-name] --force --region $AWS_REGION"
 
-# 3. Verify Port Cleanup
-echo -e "${YELLOW}📋 Step 3: Verify Port Cleanup${NC}"
-echo "  ℹ️  Checking if ports are free..."
-
-for port in 5000 15000 5432 6379 5672; do
-    if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
-        echo "  ⚠️  Port $port is still in use"
-    else
-        echo "  ✅ Port $port is free"
-    fi
-done
-
-# 4. Cleanup Docker Containers (if running)
-echo -e "${YELLOW}📋 Step 4: Docker Container Cleanup (Optional)${NC}"
-if command -v docker >/dev/null 2>&1; then
-    ASPIRE_CONTAINERS=$(docker ps -a -q -f label=aspire 2>/dev/null || echo "")
-    if [[ -n "$ASPIRE_CONTAINERS" ]]; then
-        echo "  🐳 Stopping Aspire Docker containers..."
-        echo "$ASPIRE_CONTAINERS" | xargs -r docker stop 2>/dev/null || true
-        echo "$ASPIRE_CONTAINERS" | xargs -r docker rm 2>/dev/null || true
-        echo "  ✅ Docker containers cleaned up"
-    else
-        echo "  ℹ️  No Aspire containers found"
-    fi
-else
-    echo "  ℹ️  Docker not installed"
-fi
-
-# 5. Optional: Clean build artifacts
-echo -e "${YELLOW}📋 Step 5: Build Artifacts (Optional)${NC}"
-echo "  💡 To clean build artifacts, run:"
-echo "     dotnet clean ../src/eShop.sln"
-echo "     find ../src -type d -name 'bin' -o -name 'obj' | xargs rm -rf"
-
-# 6. Cleanup Summary
+# 9. Cleanup summary
 echo ""
 echo -e "${GREEN}🎉 ===============================================${NC}"
-echo -e "${GREEN}✅ eShop Cleanup Complete!${NC}"
+echo -e "${GREEN}✅ eShop Infrastructure Cleanup Complete!${NC}"
 echo -e "${GREEN}===============================================${NC}"
 echo ""
 echo -e "${GREEN}✅ Cleanup Actions:${NC}"
-echo "  ✓ Aspire process stopped"
-echo "  ✓ Log files cleaned up"
-echo "  ✓ Ports verified"
-echo "  ✓ Docker containers cleaned"
+echo "  ✓ Helm releases deleted"
+echo "  ✓ Kubernetes deployments removed"
+echo "  ✓ Services deleted"
+echo "  ✓ LoadBalancers cleaned up"
+echo "  ✓ Persistent volumes removed"
 echo ""
 echo -e "${YELLOW}📝 Next Steps:${NC}"
-echo "  • Manually clean build artifacts if needed"
-echo "  • Verify all processes are stopped: ps aux | grep -i eshop"
-echo "  • To redeploy: run ./deploy.sh"
+echo "  • Verify all resources are removed: kubectl get all -n $NAMESPACE"
+echo "  • Monitor AWS Console for LoadBalancer cleanup (may take a few minutes)"
+echo "  • To fully destroy AWS infrastructure (RDS, VPC, etc.): cd terraform/envs/dev && terraform destroy"
+echo "  • To redeploy: ./deploy.sh"
+echo ""
+echo -e "${RED}⚠️  NOTE:${NC}"
+echo "  This script does NOT destroy:"
+echo "  - RDS databases"
+echo "  - ElastiCache clusters"
+echo "  - VPC and networking"
+echo "  - ECR repositories"
+echo "  - AWS IAM roles"
+echo ""
+echo "  To fully destroy all infrastructure, use Terraform:"
+echo "  cd terraform/envs/dev && terraform destroy"
