@@ -46,7 +46,7 @@ variable "vpc_cidr" {
 variable "availability_zones" {
   description = "List of availability zones"
   type        = list(string)
-  default     = ["eu-central-1a", "eu-central-1b", "eu-central-1c"]
+  default     = ["eu-central-1a", "eu-central-1b", "eu-central-1c"] # REQUIRED: EKS needs original 3 AZs
 }
 
 # ============================================================================
@@ -90,7 +90,7 @@ variable "eks_desired_size" {
 variable "rds_engine_version" {
   description = "PostgreSQL engine version"
   type        = string
-  default     = "15.4"
+  default     = "15.15"
 }
 
 variable "rds_instance_class" {

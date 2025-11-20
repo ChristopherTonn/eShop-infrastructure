@@ -20,14 +20,13 @@ terraform {
     }
   }
 
-  # TODO: Configure after S3 bucket is created
-  # backend "s3" {
-  #   bucket         = "eshop-terraform-state-dev"
-  #   key            = "dev/terraform.tfstate"
-  #   region         = "eu-central-1"
-  #   dynamodb_table = "eshop-terraform-lock-dev"
-  #   encrypt        = true
-  # }
+  backend "s3" {
+    bucket         = "eshop-terraform-state-dev-20251118170326"
+    key            = "dev/terraform.tfstate"
+    region         = "eu-central-1"
+    dynamodb_table = "eshop-terraform-lock-dev-20251118170326"
+    encrypt        = true
+  }
 }
 
 # ============================================================================
@@ -51,10 +50,13 @@ provider "aws" {
 
 locals {
   environment = "dev"
-  name_prefix = "${var.project_name}-${local.environment}"
+  name_prefix = "eshop-20251118170326-${local.environment}"  # Keep existing unique timestamp
   
   # Development-specific overrides
   vpc_cidr = "10.0.0.0/16"
+  
+  # DEV: Reduce AZ count to save EIPs (only 1 NAT Gateway instead of 3)
+  availability_zones_dev = ["eu-central-1a", "eu-central-1b"]  # Only 2 AZs for DEV
   
   # Smaller instances for dev
   eks_node_instance_types = ["t3.medium"]
@@ -78,7 +80,8 @@ module "vpc" {
   environment        = local.environment
   name_prefix       = local.name_prefix
   vpc_cidr          = local.vpc_cidr
-  availability_zones = var.availability_zones
+  availability_zones = local.availability_zones_dev  # Use reduced AZ count for DEV
+  single_nat_gateway = true  # DEV: Use only 1 NAT Gateway to save EIPs
   
   enable_vpc_flow_logs = var.enable_vpc_flow_logs
   
@@ -173,9 +176,13 @@ module "elasticache" {
   vpc_id             = module.vpc.vpc_id
   private_subnet_ids = module.vpc.private_subnet_ids
   
-  node_type          = local.elasticache_node_type
-  num_cache_nodes    = var.elasticache_num_cache_nodes
-  engine_version     = var.elasticache_engine_version
+  node_type                    = local.elasticache_node_type
+  num_cache_nodes              = var.elasticache_num_cache_nodes
+  engine_version               = var.elasticache_engine_version
+  
+  # Encryption configuration for DEV environment
+  enable_encryption_at_rest    = false  # DEV: Keep costs low
+  enable_encryption_in_transit = false  # DEV: Avoid auth_token complexity
   
   tags = merge(var.common_tags, {
     Environment = "development"
