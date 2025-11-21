@@ -191,3 +191,124 @@ variable "rabbitmq_resources" {
     }
   }
 }
+
+# ============================================================================
+# Monitoring Stack Configuration (Prometheus, Grafana, Alertmanager)
+# ============================================================================
+
+variable "monitoring_enabled" {
+  description = "Enable monitoring stack (Prometheus, Grafana, Alertmanager)"
+  type        = bool
+  default     = true
+}
+
+variable "prometheus_chart_version" {
+  description = "kube-prometheus-stack Helm chart version"
+  type        = string
+  default     = "25.3.1"
+}
+
+variable "prometheus_replica_count" {
+  description = "Number of Prometheus server replicas"
+  type        = number
+  default     = 1
+
+  validation {
+    condition     = var.prometheus_replica_count >= 1 && var.prometheus_replica_count <= 5
+    error_message = "Prometheus replica count must be between 1 and 5."
+  }
+}
+
+variable "prometheus_retention_days" {
+  description = "Prometheus metrics retention period in days"
+  type        = number
+  default     = 15
+
+  validation {
+    condition     = var.prometheus_retention_days >= 1 && var.prometheus_retention_days <= 365
+    error_message = "Retention period must be between 1 and 365 days."
+  }
+}
+
+variable "prometheus_storage_size" {
+  description = "Prometheus persistent volume size"
+  type        = string
+  default     = "10Gi"
+}
+
+variable "prometheus_scrape_interval" {
+  description = "Prometheus scrape interval in seconds"
+  type        = number
+  default     = 30
+
+  validation {
+    condition     = var.prometheus_scrape_interval >= 5 && var.prometheus_scrape_interval <= 300
+    error_message = "Scrape interval must be between 5 and 300 seconds."
+  }
+}
+
+variable "prometheus_evaluation_interval" {
+  description = "Prometheus evaluation interval for alert rules in seconds"
+  type        = number
+  default     = 30
+
+  validation {
+    condition     = var.prometheus_evaluation_interval >= 5 && var.prometheus_evaluation_interval <= 300
+    error_message = "Evaluation interval must be between 5 and 300 seconds."
+  }
+}
+
+variable "prometheus_resources" {
+  description = "Prometheus pod resource requests and limits"
+  type = object({
+    requests = object({
+      cpu    = string
+      memory = string
+    })
+    limits = object({
+      cpu    = string
+      memory = string
+    })
+  })
+  default = {
+    requests = {
+      cpu    = "250m"
+      memory = "512Mi"
+    }
+    limits = {
+      cpu    = "1000m"
+      memory = "2Gi"
+    }
+  }
+}
+
+variable "node_exporter_enabled" {
+  description = "Enable Node Exporter for hardware metrics"
+  type        = bool
+  default     = true
+}
+
+variable "kube_state_metrics_enabled" {
+  description = "Enable kube-state-metrics for Kubernetes metrics"
+  type        = bool
+  default     = true
+}
+
+variable "alertmanager_enabled" {
+  description = "Enable Alertmanager component"
+  type        = bool
+  default     = true
+}
+
+variable "grafana_enabled" {
+  description = "Enable Grafana component"
+  type        = bool
+  default     = true
+}
+
+variable "grafana_admin_password" {
+  description = "Grafana admin password (randomly generated if not provided)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
