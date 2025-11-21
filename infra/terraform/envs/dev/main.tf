@@ -279,8 +279,44 @@ module "rabbitmq" {
 }
 
 # ============================================================================
+# Monitoring Stack Module (Prometheus, Grafana, Alertmanager)
+# ============================================================================
+
+module "monitoring" {
+  count   = var.monitoring_enabled ? 1 : 0
+  source  = "../../modules/monitoring/prometheus"
+
+  namespace                   = "monitoring"
+  enabled                     = true
+  chart_version               = var.prometheus_chart_version
+  prometheus_replica_count    = var.prometheus_replica_count
+  retention_days              = var.prometheus_retention_days
+  storage_size                = var.prometheus_storage_size
+  scrape_interval             = var.prometheus_scrape_interval
+  evaluation_interval         = var.prometheus_evaluation_interval
+  prometheus_resources        = var.prometheus_resources
+  node_exporter_enabled       = var.node_exporter_enabled
+  kube_state_metrics_enabled  = var.kube_state_metrics_enabled
+  alertmanager_enabled        = var.alertmanager_enabled
+  grafana_enabled             = var.grafana_enabled
+  grafana_admin_password      = var.grafana_admin_password
+
+  external_labels = {
+    cluster     = "eshop-dev"
+    environment = "development"
+  }
+
+  tags = merge(var.common_tags, {
+    Environment = "development"
+  })
+
+  depends_on = [module.eks, module.rabbitmq]
+}
+
+# ============================================================================
 # Outputs
 # ============================================================================
+
 
 output "vpc_id" {
   description = "VPC ID"
@@ -349,4 +385,59 @@ output "k8s_csi_driver_status" {
     ascp                     = module.k8s_csi_driver.ascp_status
     csi_driver_role_arn      = module.k8s_csi_driver.csi_driver_role_arn
   }
+}
+
+# ============================================================================
+# Monitoring Stack Outputs
+# ============================================================================
+
+output "monitoring_enabled" {
+  description = "Whether monitoring stack is enabled"
+  value       = var.monitoring_enabled
+}
+
+output "prometheus_endpoint" {
+  description = "Prometheus server endpoint"
+  value       = var.monitoring_enabled ? module.monitoring[0].prometheus_endpoint : null
+}
+
+output "prometheus_url" {
+  description = "Full URL to access Prometheus"
+  value       = var.monitoring_enabled ? module.monitoring[0].prometheus_url : null
+}
+
+output "grafana_endpoint" {
+  description = "Grafana server endpoint"
+  value       = var.monitoring_enabled ? module.monitoring[0].grafana_endpoint : null
+}
+
+output "grafana_url" {
+  description = "Full URL to access Grafana"
+  value       = var.monitoring_enabled ? module.monitoring[0].grafana_url : null
+}
+
+output "grafana_admin_password" {
+  description = "Grafana admin password"
+  value       = var.monitoring_enabled ? module.monitoring[0].grafana_admin_password : null
+  sensitive   = true
+}
+
+output "alertmanager_endpoint" {
+  description = "Alertmanager server endpoint"
+  value       = var.monitoring_enabled ? module.monitoring[0].alertmanager_endpoint : null
+}
+
+output "alertmanager_url" {
+  description = "Full URL to access Alertmanager"
+  value       = var.monitoring_enabled ? module.monitoring[0].alertmanager_url : null
+}
+
+output "monitoring_namespace" {
+  description = "Kubernetes namespace for monitoring stack"
+  value       = var.monitoring_enabled ? module.monitoring[0].namespace : null
+}
+
+output "monitoring_deployment_info" {
+  description = "Summary of monitoring stack deployment"
+  value       = var.monitoring_enabled ? module.monitoring[0].deployment_info : null
 }
