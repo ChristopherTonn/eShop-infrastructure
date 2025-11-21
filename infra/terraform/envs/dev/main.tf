@@ -157,6 +157,7 @@ module "rds" {
   instance_class          = local.rds_instance_class
   allocated_storage       = local.rds_allocated_storage
   backup_retention_period = var.rds_backup_retention_period
+  skip_final_snapshot     = var.rds_skip_final_snapshot
 
   tags = merge(var.common_tags, {
     Environment = "development"

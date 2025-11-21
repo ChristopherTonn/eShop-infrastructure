@@ -72,6 +72,12 @@ variable "rds_backup_retention_period" {
   default     = 7
 }
 
+variable "rds_skip_final_snapshot" {
+  description = "Skip creation of final snapshot when destroying RDS instance"
+  type        = bool
+  default     = false
+}
+
 # ElastiCache Configuration
 variable "elasticache_engine_version" {
   description = "Redis engine version"

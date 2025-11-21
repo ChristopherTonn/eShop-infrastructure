@@ -70,6 +70,12 @@ variable "enable_deletion_protection" {
   default     = false
 }
 
+variable "skip_final_snapshot" {
+  description = "Skip creation of final snapshot when destroying RDS instance (useful for ephemeral environments)"
+  type        = bool
+  default     = false
+}
+
 variable "tags" {
   description = "Tags to apply to resources"
   type        = map(string)

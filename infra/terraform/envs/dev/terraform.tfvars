@@ -82,3 +82,6 @@ rabbitmq_resources = {
 enable_monitoring = false # Disabled for dev to save costs
 enable_backup     = false
 enable_multi_az   = false
+
+# Backup Configuration
+rds_skip_final_snapshot = true # Skip final snapshot in dev (ephemeral environment)
