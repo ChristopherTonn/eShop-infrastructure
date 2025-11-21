@@ -196,7 +196,7 @@ resource "aws_eks_cluster" "main" {
     for_each = var.enable_cluster_encryption ? [1] : []
     content {
       provider {
-        key_id = aws_kms_key.cluster[0].arn
+        key_arn = aws_kms_key.cluster[0].arn
       }
       resources = ["secrets"]
     }
@@ -301,17 +301,19 @@ resource "aws_iam_openid_connect_provider" "cluster" {
 # ============================================================================
 
 resource "aws_eks_addon" "vpc_cni" {
-  cluster_name = aws_eks_cluster.main.name
-  addon_name   = "vpc-cni"
-  resolve_conflicts = "OVERWRITE"
+  cluster_name                    = aws_eks_cluster.main.name
+  addon_name                      = "vpc-cni"
+  resolve_conflicts_on_create     = "OVERWRITE"
+  resolve_conflicts_on_update     = "OVERWRITE"
 
   tags = var.tags
 }
 
 resource "aws_eks_addon" "coredns" {
-  cluster_name = aws_eks_cluster.main.name
-  addon_name   = "coredns"
-  resolve_conflicts = "OVERWRITE"
+  cluster_name                    = aws_eks_cluster.main.name
+  addon_name                      = "coredns"
+  resolve_conflicts_on_create     = "OVERWRITE"
+  resolve_conflicts_on_update     = "OVERWRITE"
 
   depends_on = [aws_eks_node_group.main]
 
@@ -319,9 +321,10 @@ resource "aws_eks_addon" "coredns" {
 }
 
 resource "aws_eks_addon" "kube_proxy" {
-  cluster_name = aws_eks_cluster.main.name
-  addon_name   = "kube-proxy"
-  resolve_conflicts = "OVERWRITE"
+  cluster_name                    = aws_eks_cluster.main.name
+  addon_name                      = "kube-proxy"
+  resolve_conflicts_on_create     = "OVERWRITE"
+  resolve_conflicts_on_update     = "OVERWRITE"
 
   tags = var.tags
 }

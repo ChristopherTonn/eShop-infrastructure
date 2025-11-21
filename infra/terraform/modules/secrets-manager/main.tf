@@ -118,20 +118,33 @@ resource "aws_secretsmanager_secret_version" "api_keys" {
 # Additional Secrets
 # ============================================================================
 
+# Note: We use a workaround for sensitive values in for_each
+# Convert sensitive map to list with index, then create a map from it
+locals {
+  additional_secrets_list = [
+    for key, value in var.additional_secrets : {
+      key   = key
+      value = value
+    }
+  ]
+}
+
 resource "aws_secretsmanager_secret" "additional" {
-  for_each                = var.additional_secrets
-  name                    = "${var.name_prefix}/app/${each.key}"
-  description             = "Application secret: ${each.key} for ${var.environment}"
-  kms_key_id             = var.kms_key_id
+  count = length(local.additional_secrets_list)
+
+  name                    = "${var.name_prefix}/app/${local.additional_secrets_list[count.index].key}"
+  description             = "Application secret: ${local.additional_secrets_list[count.index].key} for ${var.environment}"
+  kms_key_id              = var.kms_key_id
   recovery_window_in_days = var.recovery_window_in_days
 
   tags = merge(var.tags, {
-    Name = "${var.name_prefix}-${each.key}"
+    Name = "${var.name_prefix}-${local.additional_secrets_list[count.index].key}"
   })
 }
 
 resource "aws_secretsmanager_secret_version" "additional" {
-  for_each      = var.additional_secrets
-  secret_id     = aws_secretsmanager_secret.additional[each.key].id
-  secret_string = each.value
+  count = length(local.additional_secrets_list)
+
+  secret_id     = aws_secretsmanager_secret.additional[count.index].id
+  secret_string = local.additional_secrets_list[count.index].value
 }

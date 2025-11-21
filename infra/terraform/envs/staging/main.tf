@@ -4,7 +4,7 @@
 
 terraform {
   required_version = ">= 1.6"
-  
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -36,7 +36,7 @@ terraform {
 
 provider "aws" {
   region = var.aws_region
-  
+
   default_tags {
     tags = merge(var.common_tags, {
       Environment = "staging"
@@ -52,19 +52,19 @@ provider "aws" {
 locals {
   environment = "staging"
   name_prefix = "${var.project_name}-${local.environment}"
-  
+
   # Staging-specific configuration
   vpc_cidr = "10.1.0.0/16"
-  
+
   # Medium-sized instances for staging
   eks_node_instance_types = ["t3.medium", "t3.large"]
-  eks_desired_size       = 3
-  eks_min_size          = 2
-  eks_max_size          = 8
-  
-  rds_instance_class     = "db.t3.small"
-  rds_allocated_storage  = 50
-  
+  eks_desired_size        = 3
+  eks_min_size            = 2
+  eks_max_size            = 8
+
+  rds_instance_class    = "db.t3.small"
+  rds_allocated_storage = 50
+
   elasticache_node_type = "cache.t3.small"
 }
 
@@ -74,14 +74,14 @@ locals {
 
 module "vpc" {
   source = "../../modules/vpc"
-  
+
   environment        = local.environment
-  name_prefix       = local.name_prefix
-  vpc_cidr          = local.vpc_cidr
+  name_prefix        = local.name_prefix
+  vpc_cidr           = local.vpc_cidr
   availability_zones = var.availability_zones
-  
+
   enable_vpc_flow_logs = var.enable_vpc_flow_logs
-  
+
   tags = merge(var.common_tags, {
     Environment = "staging"
   })
@@ -93,9 +93,9 @@ module "vpc" {
 
 module "ecr" {
   source = "../../modules/ecr"
-  
+
   name_prefix = local.name_prefix
-  
+
   repositories = [
     "basket-api",
     "catalog-api",
@@ -107,7 +107,7 @@ module "ecr" {
     "webapp",
     "webhook-client"
   ]
-  
+
   tags = merge(var.common_tags, {
     Environment = "staging"
   })
@@ -119,19 +119,19 @@ module "ecr" {
 
 module "eks" {
   source = "../../modules/eks"
-  
-  environment   = local.environment
-  name_prefix   = local.name_prefix
-  
+
+  environment = local.environment
+  name_prefix = local.name_prefix
+
   vpc_id             = module.vpc.vpc_id
   private_subnet_ids = module.vpc.private_subnet_ids
-  
-  cluster_version    = var.eks_cluster_version
+
+  cluster_version     = var.eks_cluster_version
   node_instance_types = local.eks_node_instance_types
-  min_size          = local.eks_min_size
-  max_size          = local.eks_max_size
-  desired_size      = local.eks_desired_size
-  
+  min_size            = local.eks_min_size
+  max_size            = local.eks_max_size
+  desired_size        = local.eks_desired_size
+
   tags = merge(var.common_tags, {
     Environment = "staging"
   })
@@ -143,18 +143,18 @@ module "eks" {
 
 module "rds" {
   source = "../../modules/rds"
-  
+
   environment = local.environment
   name_prefix = local.name_prefix
-  
+
   vpc_id             = module.vpc.vpc_id
   private_subnet_ids = module.vpc.private_subnet_ids
-  
-  engine_version           = var.rds_engine_version
-  instance_class           = local.rds_instance_class
-  allocated_storage        = local.rds_allocated_storage
-  backup_retention_period  = 14 # Longer retention for staging
-  
+
+  engine_version          = var.rds_engine_version
+  instance_class          = local.rds_instance_class
+  allocated_storage       = local.rds_allocated_storage
+  backup_retention_period = 14 # Longer retention for staging
+
   tags = merge(var.common_tags, {
     Environment = "staging"
   })
@@ -166,17 +166,17 @@ module "rds" {
 
 module "elasticache" {
   source = "../../modules/elasticache"
-  
+
   environment = local.environment
   name_prefix = local.name_prefix
-  
+
   vpc_id             = module.vpc.vpc_id
   private_subnet_ids = module.vpc.private_subnet_ids
-  
-  node_type          = local.elasticache_node_type
-  num_cache_nodes    = 2 # More nodes for staging
-  engine_version     = var.elasticache_engine_version
-  
+
+  node_type       = local.elasticache_node_type
+  num_cache_nodes = 2 # More nodes for staging
+  engine_version  = var.elasticache_engine_version
+
   tags = merge(var.common_tags, {
     Environment = "staging"
   })
