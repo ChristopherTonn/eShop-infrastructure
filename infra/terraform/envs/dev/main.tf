@@ -20,14 +20,13 @@ terraform {
     }
   }
 
-  # TODO: Configure after S3 bucket is created
-  # backend "s3" {
-  #   bucket         = "eshop-terraform-state-dev"
-  #   key            = "dev/terraform.tfstate"
-  #   region         = "eu-central-1"
-  #   dynamodb_table = "eshop-terraform-lock-dev"
-  #   encrypt        = true
-  # }
+  backend "s3" {
+    bucket         = "eshop-terraform-state-dev"
+    key            = "dev/terraform.tfstate"
+    region         = "eu-central-1"
+    dynamodb_table = "eshop-terraform-lock-dev"
+    encrypt        = true
+  }
 }
 
 # ============================================================================
@@ -183,6 +182,37 @@ module "elasticache" {
 }
 
 # ============================================================================
+# AWS Secrets Manager Module
+# ============================================================================
+
+module "secrets_manager" {
+  source = "../../modules/secrets-manager"
+  
+  environment = local.environment
+  name_prefix = local.name_prefix
+  
+  rds_username  = var.rds_master_username
+  rds_password  = var.rds_master_password
+  
+  redis_password = var.redis_password
+  
+  jwt_secret = var.jwt_signing_secret
+  
+  rabbitmq_username = var.rabbitmq_username
+  rabbitmq_password = var.rabbitmq_password
+  
+  api_keys = var.api_keys
+  
+  additional_secrets = var.additional_secrets
+  
+  kms_key_id = var.secrets_kms_key_id
+  
+  tags = merge(var.common_tags, {
+    Environment = "development"
+  })
+}
+
+# ============================================================================
 # Outputs
 # ============================================================================
 
@@ -217,4 +247,15 @@ output "elasticache_endpoint" {
 output "ecr_repositories" {
   description = "ECR repository URLs"
   value       = module.ecr.repository_urls
+}
+
+output "secrets_manager_arns" {
+  description = "AWS Secrets Manager secret ARNs"
+  value = {
+    rds      = module.secrets_manager.rds_secret_arn
+    jwt      = module.secrets_manager.jwt_secret_arn
+    rabbitmq = module.secrets_manager.rabbitmq_secret_arn
+    redis    = module.secrets_manager.redis_secret_arn
+    api_keys = module.secrets_manager.api_keys_secret_arn
+  }
 }
