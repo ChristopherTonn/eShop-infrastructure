@@ -1,0 +1,163 @@
+# ============================================================================
+# Prometheus Alert Rules - PrometheusRule Custom Resource
+# ============================================================================
+# Alert rules for common infrastructure and application health checks
+
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: eshop-alerts
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: prometheus
+    prometheus: kube-prometheus-stack
+spec:
+  groups:
+    # ====================================================================
+    # Kubernetes Cluster Health Alerts
+    # ====================================================================
+    - name: kubernetes.rules
+      interval: 30s
+      rules:
+        - alert: KubernetesPodCrashLooping
+          expr: 'rate(kube_pod_container_status_restarts_total[15m]) > 0.1'
+          for: 5m
+          labels:
+            severity: critical
+            component: kubernetes
+          annotations:
+            summary: "Kubernetes pod crash looping (instance {{ $labels.namespace }}/{{ $labels.pod }})"
+            description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is crash looping"
+
+        - alert: KubernetesPodNotHealthy
+          expr: 'kube_pod_status_phase{phase=~"Pending|Unknown|Failed"} == 1'
+          for: 15m
+          labels:
+            severity: warning
+            component: kubernetes
+          annotations:
+            summary: "Kubernetes Pod not healthy (instance {{ $labels.namespace }}/{{ $labels.pod }})"
+            description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} has been in a non-ready state for more than 15 minutes."
+
+        - alert: KubernetesNodeNotReady
+          expr: 'kube_node_status_condition{condition="Ready",status="true"} == 0'
+          for: 5m
+          labels:
+            severity: critical
+            component: kubernetes
+          annotations:
+            summary: "Kubernetes Node not ready (instance {{ $labels.node }})"
+            description: "Node {{ $labels.node }} has been unready for a long time"
+
+        - alert: KubernetesNodeMemoryPressure
+          expr: 'kube_node_status_condition{condition="MemoryPressure",status="true"} == 1'
+          for: 5m
+          labels:
+            severity: warning
+            component: kubernetes
+          annotations:
+            summary: "Kubernetes memory pressure (instance {{ $labels.node }})"
+            description: "Node {{ $labels.node }} has MemoryPressure condition"
+
+        - alert: KubernetesNodeDiskPressure
+          expr: 'kube_node_status_condition{condition="DiskPressure",status="true"} == 1'
+          for: 5m
+          labels:
+            severity: warning
+            component: kubernetes
+          annotations:
+            summary: "Kubernetes disk pressure (instance {{ $labels.node }})"
+            description: "Node {{ $labels.node }} has DiskPressure condition"
+
+    # ====================================================================
+    # RabbitMQ Health Alerts
+    # ====================================================================
+    - name: rabbitmq.rules
+      interval: 30s
+      rules:
+        - alert: RabbitMQDown
+          expr: 'rabbitmq_up == 0'
+          for: 5m
+          labels:
+            severity: critical
+            component: rabbitmq
+          annotations:
+            summary: "RabbitMQ is down (instance {{ $labels.instance }})"
+            description: "RabbitMQ instance {{ $labels.instance }} is down"
+
+        - alert: RabbitMQMemoryHigh
+          expr: 'rabbitmq_process_resident_memory_bytes / rabbitmq_resident_memory_limit_bytes > 0.9'
+          for: 5m
+          labels:
+            severity: warning
+            component: rabbitmq
+          annotations:
+            summary: "RabbitMQ memory usage is high (instance {{ $labels.instance }})"
+            description: "RabbitMQ instance {{ $labels.instance }} memory usage is above 90%"
+
+        - alert: RabbitMQUnackMessages
+          expr: 'rabbitmq_queue_messages_unacked > 1000'
+          for: 5m
+          labels:
+            severity: warning
+            component: rabbitmq
+          annotations:
+            summary: "RabbitMQ unacked messages (queue {{ $labels.queue }})"
+            description: "Queue {{ $labels.queue }} has {{ $value }} unacked messages"
+
+        - alert: RabbitMQConnectionsHigh
+          expr: 'rabbitmq_connections > 100'
+          for: 5m
+          labels:
+            severity: warning
+            component: rabbitmq
+          annotations:
+            summary: "RabbitMQ connections high (instance {{ $labels.instance }})"
+            description: "RabbitMQ instance {{ $labels.instance }} has {{ $value }} connections"
+
+    # ====================================================================
+    # Container Resource Alerts
+    # ====================================================================
+    - name: container.rules
+      interval: 30s
+      rules:
+        - alert: ContainerCpuUsageHigh
+          expr: '(sum(rate(container_cpu_usage_seconds_total[5m])) by (pod_name, namespace) / sum(container_spec_cpu_quota/container_spec_cpu_period) by (pod_name, namespace)) > 0.9'
+          for: 10m
+          labels:
+            severity: warning
+            component: container
+          annotations:
+            summary: "Container CPU usage is high (instance {{ $labels.pod_name }})"
+            description: "Container {{ $labels.pod_name }} CPU usage is above 90%"
+
+        - alert: ContainerMemoryUsageHigh
+          expr: '(sum(container_memory_usage_bytes) by (pod_name, namespace) / sum(container_spec_memory_limit_bytes) by (pod_name, namespace)) > 0.9'
+          for: 10m
+          labels:
+            severity: warning
+            component: container
+          annotations:
+            summary: "Container memory usage is high (instance {{ $labels.pod_name }})"
+            description: "Container {{ $labels.pod_name }} memory usage is above 90%"
+
+    # ====================================================================
+    # Recording Rules (Aggregations for Better Performance)
+    # ====================================================================
+    - name: recording.rules
+      interval: 30s
+      rules:
+        - record: 'instance:node_cpu:rate5m'
+          expr: '100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)'
+
+        - record: 'instance:node_memory_utilisation:ratio'
+          expr: '1 - ((node_memory_MemAvailable_bytes / 1024 / 1024 / 1024) / (node_memory_MemTotal_bytes / 1024 / 1024 / 1024))'
+
+        - record: 'instance:node_filesystem_usage:ratio'
+          expr: '(node_filesystem_size_bytes{fstype!~"tmpfs"} - node_filesystem_avail_bytes) / node_filesystem_size_bytes'
+
+        - record: 'kubernetes:container_memory_usage:sum'
+          expr: 'sum by (namespace, pod) (container_memory_usage_bytes{pod!=""})'
+
+        - record: 'kubernetes:container_cpu_usage:sum'
+          expr: 'sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{pod!=""}[5m]))'
