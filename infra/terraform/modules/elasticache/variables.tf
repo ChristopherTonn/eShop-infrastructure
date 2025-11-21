@@ -58,6 +58,24 @@ variable "enable_backup" {
   default     = false
 }
 
+variable "backup_retention_limit" {
+  description = "Number of days to retain backup snapshots"
+  type        = number
+  default     = 5
+}
+
+variable "backup_window" {
+  description = "Preferred backup window (HH:MM-HH:MM UTC)"
+  type        = string
+  default     = "03:00-05:00"
+}
+
+variable "maintenance_window" {
+  description = "Preferred maintenance window (ddd:HH:MM-ddd:HH:MM UTC)"
+  type        = string
+  default     = "sun:04:00-sun:05:00"
+}
+
 variable "tags" {
   description = "Tags to apply to resources"
   type        = map(string)

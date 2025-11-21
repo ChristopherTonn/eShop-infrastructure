@@ -174,8 +174,8 @@ resource "aws_db_instance" "main" {
   enabled_cloudwatch_logs_exports = ["postgresql"]
 
   # Final snapshot
-  final_snapshot_identifier = "${var.name_prefix}-postgres-final-snapshot"
-  skip_final_snapshot      = false
+  final_snapshot_identifier = var.skip_final_snapshot ? null : "${var.name_prefix}-postgres-final-snapshot"
+  skip_final_snapshot      = var.skip_final_snapshot
 
   # Apply changes immediately for non-prod environments
   apply_immediately = var.environment != "prod"
