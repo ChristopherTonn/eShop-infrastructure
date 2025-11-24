@@ -10,43 +10,43 @@ This document describes the deployment, configuration, and operational procedure
 ┌──────────────────────────────────────────────────────────────────┐
 │                     Kubernetes Cluster                           │
 ├──────────────────────────────────────────────────────────────────┤
-│                                                                   │
-│  ┌────────────────────── monitoring Namespace ───────────────┐  │
-│  │                                                             │  │
-│  │  ┌─────────────────┐     ┌──────────────────┐            │  │
-│  │  │   Prometheus    │     │     Grafana      │            │  │
-│  │  │  Server (x1)    │────►│  (Dashboards)    │            │  │
-│  │  │  Port 9090      │     │  Port 80         │            │  │
-│  │  └─────────────────┘     └──────────────────┘            │  │
-│  │          ▲                                                │  │
-│  │          │                                                │  │
-│  │      ┌───┴────────────────────────────────┐             │  │
-│  │      │                                    │             │  │
-│  │  ┌───▼────────────┐     ┌─────────────┐  │             │  │
-│  │  │  Prometheus    │     │  Alerting   │  │             │  │
-│  │  │  Operator      │     │  Rules      │  │             │  │
-│  │  └───────────────┘     │(PrometheusRu│  │             │  │
-│  │  ┌─────────────────┐    │  le CRDs)   │  │             │  │
-│  │  │ Node Exporter   │    └─────────────┘  │             │  │
-│  │  │ (DaemonSet)     │                     │             │  │
-│  │  └─────────────────┘                     │             │  │
-│  │  ┌─────────────────┐     ┌──────────────┐│             │  │
-│  │  │kube-state-      │     │ Alertmanager ││             │  │
-│  │  │metrics          │     │ Port 9093    ││             │  │
-│  │  └─────────────────┘     └──────────────┘│             │  │
-│  │                                           │             │  │
-│  └───────────────────────────────────────────┘             │  │
-│                                                             │  │
-│  ┌────────────────────── rabbitmq Namespace ──────────────┐ │  │
-│  │                                                          │ │  │
-│  │  ┌─────────────────┐                                   │ │  │
-│  │  │  RabbitMQ       │──► Prometheus (Port 15692)       │ │  │
-│  │  │  Prometheus     │──► Prometheus Metrics            │ │  │
-│  │  │  Plugin         │                                   │ │  │
-│  │  └─────────────────┘                                   │ │  │
-│  │                                                          │ │  │
-│  └──────────────────────────────────────────────────────────┘ │  │
-│                                                                 │  │
+│                                                                  │
+│  ┌────────────────────── monitoring Namespace ───────────────┐   │
+│  │                                                           │   │
+│  │  ┌─────────────────┐     ┌──────────────────┐             │   │
+│  │  │   Prometheus    │     │     Grafana      │             │   │
+│  │  │  Server (x1)    │────►│  (Dashboards)    │             │   │
+│  │  │  Port 9090      │     │  Port 80         │             │   │
+│  │  └─────────────────┘     └──────────────────┘             │   │
+│  │          ▲                                                │   │
+│  │          │                                                │   │
+│  │      ┌───┴────────────────────────────────┐               │   │
+│  │      │                                    │               │   │
+│  │  ┌───▼────────────┐     ┌─────────────┐   │               │   │
+│  │  │  Prometheus    │     │  Alerting   │   │               │   │
+│  │  │  Operator      │     │  Rules      │   │               │   │
+│  │  └───────────────┘     │(PrometheusRu│    │               │   │
+│  │  ┌─────────────────┐    │  le CRDs)   │   │               │   │
+│  │  │ Node Exporter   │    └─────────────┘   │               │   │
+│  │  │ (DaemonSet)     │                      │               │   │
+│  │  └─────────────────┘                      │               │   │
+│  │  ┌─────────────────┐     ┌──────────────┐ │               │   │
+│  │  │kube-state-      │     │ Alertmanager │ │               │   │
+│  │  │metrics          │     │ Port 9093    │ │               │   │
+│  │  └─────────────────┘     └──────────────┘ │               │   │
+│  │                                           │               │   │
+│  └───────────────────────────────────────────┘               │   │
+│                                                              │   │
+│  ┌────────────────────── rabbitmq Namespace ──────────────┐  │   │
+│  │                                                        │  │   │
+│  │  ┌─────────────────┐                                   │  │   │
+│  │  │  RabbitMQ       │──► Prometheus (Port 15692)        │  │   │
+│  │  │  Prometheus     │──► Prometheus Metrics             │  │   │
+│  │  │  Plugin         │                                   │  │   │
+│  │  └─────────────────┘                                   │  │   │
+│  │                                                        │  │   │
+│  └────────────────────────────────────────────────────────┘  │   │
+│                                                              │   │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -84,6 +84,7 @@ terraform plan -target=module.monitoring
 ```
 
 Important outputs:
+
 - `monitoring_enabled`: true/false
 - `prometheus_endpoint`: Service DNS
 - `grafana_url`: Grafana access URL
@@ -127,6 +128,7 @@ kubectl port-forward -n monitoring svc/kube-prometheus-stack-alertmanager 9093:9
 ```
 
 Access URLs:
+
 - Prometheus: http://localhost:9090
 - Grafana: http://localhost:3000 (admin / <password>)
 - Alertmanager: http://localhost:9093
@@ -135,9 +137,9 @@ Access URLs:
 
 ```yaml
 # From other pods within the cluster
-prometheus:        http://kube-prometheus-stack.monitoring.svc.cluster.local:9090
-grafana:           http://kube-prometheus-stack-grafana.monitoring.svc.cluster.local:80
-alertmanager:      http://kube-prometheus-stack-alertmanager.monitoring.svc.cluster.local:9093
+prometheus: http://kube-prometheus-stack.monitoring.svc.cluster.local:9090
+grafana: http://kube-prometheus-stack-grafana.monitoring.svc.cluster.local:80
+alertmanager: http://kube-prometheus-stack-alertmanager.monitoring.svc.cluster.local:9093
 ```
 
 ### 3.3 Grafana Initial Setup
@@ -291,16 +293,16 @@ Alertmanager routing configured in `alertmanager.yaml`:
 
 ```yaml
 route:
-  group_by: ['alertname', 'cluster', 'service']
-  group_wait: 30s        # Wait 30s before first alert
-  group_interval: 5m     # Batch updates every 5 min
-  repeat_interval: 12h   # Repeat alert every 12h
-  receiver: 'default'
-  
+  group_by: ["alertname", "cluster", "service"]
+  group_wait: 30s # Wait 30s before first alert
+  group_interval: 5m # Batch updates every 5 min
+  repeat_interval: 12h # Repeat alert every 12h
+  receiver: "default"
+
   routes:
     - match:
         severity: critical
-      receiver: 'critical'
+      receiver: "critical"
       group_wait: 10s
       repeat_interval: 1h
 ```
@@ -310,6 +312,7 @@ route:
 ### 7.1 Predefined Dashboards
 
 kube-prometheus-stack automatically installs:
+
 - Kubernetes / Compute Resources
 - Kubernetes / Cluster Monitoring
 - Prometheus / Prometheus Stats
@@ -332,6 +335,7 @@ kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80
 Included in repository: `infra/terraform/modules/monitoring/prometheus/grafana-dashboard-rabbitmq.json`
 
 Import steps:
+
 1. Grafana UI → Dashboards → Import
 2. Upload JSON file
 3. Select DataSource: Prometheus
