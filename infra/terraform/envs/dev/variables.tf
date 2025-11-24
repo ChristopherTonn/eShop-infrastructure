@@ -312,3 +312,96 @@ variable "grafana_admin_password" {
   sensitive   = true
   default     = ""
 }
+
+# ============================================================================
+# Logging Configuration (CloudWatch + Fluent Bit)
+# ============================================================================
+
+variable "logging_enabled" {
+  description = "Enable centralized logging with CloudWatch and Fluent Bit"
+  type        = bool
+  default     = true
+}
+
+variable "cloudwatch_log_retention_days" {
+  description = "CloudWatch Logs retention period in days"
+  type        = number
+  default     = 7
+
+  validation {
+    condition     = contains([1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, 3653], var.cloudwatch_log_retention_days)
+    error_message = "Log retention days must be a valid CloudWatch value."
+  }
+}
+
+variable "cloudwatch_enable_kms_encryption" {
+  description = "Enable KMS encryption for CloudWatch Logs"
+  type        = bool
+  default     = false
+}
+
+variable "cloudwatch_kms_key_arn" {
+  description = "KMS key ARN for CloudWatch Logs encryption"
+  type        = string
+  default     = ""
+}
+
+variable "fluent_bit_enabled" {
+  description = "Enable Fluent Bit DaemonSet for log forwarding"
+  type        = bool
+  default     = true
+}
+
+variable "fluent_bit_chart_version" {
+  description = "Fluent Bit Helm chart version"
+  type        = string
+  default     = "0.21.0"
+}
+
+variable "fluent_bit_image_tag" {
+  description = "Fluent Bit image tag"
+  type        = string
+  default     = "2.1.8"
+}
+
+variable "fluent_bit_resources" {
+  description = "Fluent Bit pod resource requests and limits"
+  type = object({
+    requests = object({
+      cpu    = string
+      memory = string
+    })
+    limits = object({
+      cpu    = string
+      memory = string
+    })
+  })
+  default = {
+    requests = {
+      cpu    = "100m"
+      memory = "128Mi"
+    }
+    limits = {
+      cpu    = "500m"
+      memory = "512Mi"
+    }
+  }
+}
+
+variable "fluent_bit_buffer_size" {
+  description = "Fluent Bit buffer size limit"
+  type        = string
+  default     = "32m"
+}
+
+variable "fluent_bit_enable_container_insights" {
+  description = "Enable CloudWatch Container Insights formatting"
+  type        = bool
+  default     = true
+}
+
+variable "fluent_bit_enable_multiline_parsing" {
+  description = "Enable multiline log parsing for exception messages"
+  type        = bool
+  default     = true
+}
