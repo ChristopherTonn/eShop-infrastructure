@@ -164,6 +164,17 @@ echo -e "${YELLOW}📋 Step 9: Clean up ECR Images (Optional)${NC}"
 echo "  💡 To delete ECR repositories, run:"
 echo "     aws ecr delete-repository --repository-name eshop-[service-name] --force --region $AWS_REGION"
 
+# 9.5 Clean up local Terraform state files
+echo -e "${YELLOW}📋 Step 9.5: Clean up Local Terraform State${NC}"
+TERRAFORM_DIR="terraform/envs/dev"
+if [[ -d "$TERRAFORM_DIR" ]]; then
+    echo "  🧹 Removing local state files from $TERRAFORM_DIR..."
+    rm -f "$TERRAFORM_DIR/terraform.tfstate"* "$TERRAFORM_DIR/tfplan"* "$TERRAFORM_DIR/.terraform.lock.hcl" 2>/dev/null || true
+    echo "  ✅ Local state files cleaned"
+else
+    echo "  ℹ️  Terraform directory not found"
+fi
+
 # 10. AWS Infrastructure Cleanup (SAFE - using AWS CLI, not terraform destroy)
 echo -e "${YELLOW}📋 Step 10: AWS Infrastructure Cleanup${NC}"
 echo ""
@@ -211,7 +222,21 @@ if [[ "${CLEANUP_AWS:-false}" == "true" ]]; then
     echo "    ⏳ Deleting EKS cluster: $CLUSTER_NAME"
     aws eks delete-cluster --name $CLUSTER_NAME --region $AWS_REGION 2>/dev/null || true
     
-    echo "  ✅ AWS cleanup initiated (async)"
+    # 10.6 Clean up Remote State (S3 + DynamoDB)
+    echo "  Step 10.6: Clean up Remote Terraform State..."
+    BUCKET_NAME="eshop-terraform-state-dev-$AWS_ACCOUNT"
+    TABLE_NAME="eshop-terraform-lock-dev"
+    LOCK_ID="eshop-terraform-state-dev-$AWS_ACCOUNT/dev/terraform.tfstate"
+    
+    echo "    • Cleaning S3 bucket: $BUCKET_NAME"
+    if aws s3api head-bucket --bucket "$BUCKET_NAME" 2>/dev/null; then
+        aws s3 rm "s3://$BUCKET_NAME" --recursive --region $AWS_REGION 2>/dev/null || true
+    fi
+    
+    echo "    • Cleaning DynamoDB table: $TABLE_NAME"
+    aws dynamodb delete-item --table-name "$TABLE_NAME" --key "{\"LockID\":{\"S\":\"$LOCK_ID\"}}" --region $AWS_REGION 2>/dev/null || true
+    
+    echo "  ✅ Remote state cleaned"
     echo ""
     echo -e "${YELLOW}⏳ Note: AWS resource deletion is asynchronous${NC}"
     echo "   - Check AWS Console for progress"
