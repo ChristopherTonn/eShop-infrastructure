@@ -447,9 +447,3 @@ variable "alertmanager_smtp_password" {
   sensitive   = true
 }
 
-variable "alertmanager_enabled" {
-  description = "Enable Alertmanager with email notifications"
-  type        = bool
-  default     = true
-}
-

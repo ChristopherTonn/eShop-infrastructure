@@ -13,8 +13,8 @@ common_tags = {
   Environment = "development"
   Terraform   = "true"
   ManagedBy   = "Terraform"
-  CostCenter  = "dev-ops"
-  Owner       = "Platform Team"
+  CostCenter  = "devops"
+  Owner       = "platform-team"
   CreatedAt   = "2025-11-21"
 }
 
@@ -37,14 +37,6 @@ rds_master_username                       = "postgres"
 rds_master_password                       = "DevPassword123!@#" # Change this to strong password in production
 rds_backup_retention_period               = 1  # Minimal: 1 day only (saves ~$2/day)
 rds_allocated_storage                     = 20
-rds_max_allocated_storage                 = 100
-rds_parameter_group_family                = "postgres15"
-rds_storage_type                          = "gp3"
-rds_multi_az                              = false
-rds_enable_performance_insights           = false  # Disabled for test (saves ~$5/day)
-rds_performance_insights_retention_period = 7
-rds_enable_enhanced_monitoring            = false  # Disabled for test (saves ~$1/day)
-rds_monitoring_interval                   = 60
 
 # SMTP Configuration for Alertmanager Email Notifications
 alertmanager_smtp_host     = "smtp.gmail.com"
@@ -71,7 +63,7 @@ rabbitmq_username  = "guest"
 rabbitmq_password  = "DevRabbitPassword123!@#"
 
 # RabbitMQ Configuration (Helm)
-rabbitmq_enabled       = true
+rabbitmq_enabled       = false  # Disabled - wegen K8s Provider Issue
 rabbitmq_chart_version = "13.0.0"
 rabbitmq_replica_count = 1 # Dev: single replica
 rabbitmq_storage_size  = "5Gi"
@@ -86,26 +78,27 @@ rabbitmq_resources = {
   }
 }
 
-# Feature Flags - OPTIMIZED FOR TESTING (cost reduction)
+# Skip K8s CSI Driver for now (depends on K8s Provider)
+k8s_csi_driver_enabled = false# Feature Flags - OPTIMIZED FOR TESTING (cost reduction)
 enable_monitoring = false # Disabled for test
 enable_backup     = false # Disabled for test
 enable_multi_az   = false # Single AZ for test
 
 # Monitoring Stack Configuration - FULL E2E TESTING
-monitoring_enabled                    = true   # Enable Prometheus/Grafana for testing
-alertmanager_enabled                  = true   # Enable alerts for testing (+$3.60/day)
-grafana_enabled                        = true   # Enable Grafana dashboards for testing
+monitoring_enabled                    = false  # Disabled - wegen K8s Provider Issue
+alertmanager_enabled                  = false  # Disabled
+grafana_enabled                        = false  # Disabled
 prometheus_replica_count              = 1
-prometheus_retention_days             = 1      # Minimal retention for test data
-node_exporter_enabled                 = false  # Disable node metrics (save costs)
-kube_state_metrics_enabled            = false  # Disable k8s metrics (save costs)
+prometheus_retention_days             = 1
+node_exporter_enabled                 = false
+kube_state_metrics_enabled            = false
 
 # Logging Configuration - FULL E2E TESTING
-logging_enabled                           = true   # Enable CloudWatch logs for testing (+$16.80/day)
-fluent_bit_enabled                       = true   # Enable log forwarding
-cloudwatch_log_retention_days             = 1      # Minimal retention
-fluent_bit_enable_container_insights     = false  # Disable Container Insights (save costs)
-fluent_bit_enable_multiline_parsing      = true   # Enable for better log parsing
+logging_enabled                           = false  # Disabled - wegen K8s Provider Issue
+fluent_bit_enabled                       = false  # Disabled
+cloudwatch_log_retention_days             = 1
+fluent_bit_enable_container_insights     = false
+fluent_bit_enable_multiline_parsing      = true
 
 # Backup Configuration - OPTIMIZED FOR TESTING
 rds_skip_final_snapshot = true # Skip final snapshot (ephemeral test environment)

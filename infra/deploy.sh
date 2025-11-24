@@ -64,15 +64,13 @@ cd terraform/bootstrap
 # Check which resources are missing
 DEV_BUCKET_EXISTS=false
 DEV_TABLE_EXISTS=false
-BUCKET_NAME="eshop-terraform-state-dev-$(date +%s)"  # Unique bucket name
-TABLE_NAME="eshop-terraform-lock-dev-$(date +%s)"   # Unique table name
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+BUCKET_NAME="eshop-terraform-state-dev-$ACCOUNT_ID"  # Unique bucket name with account ID
+TABLE_NAME="eshop-terraform-lock-dev"   # Standard table name
 
-echo "  🎯 Using unique resource names to avoid conflicts:"
+echo "  🎯 Using standard resource names:"
 echo "    Bucket: $BUCKET_NAME"
 echo "    Table: $TABLE_NAME"
-
-# Update terraform variables for unique naming
-export TF_VAR_bucket_suffix=$(date +%s)
 
 if bucket_exists_our_account "$BUCKET_NAME"; then
     echo "  ✓ S3 bucket $BUCKET_NAME already exists"

@@ -48,6 +48,25 @@ provider "aws" {
   }
 }
 
+provider "kubernetes" {
+  host                   = module.eks.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+  token                  = data.aws_eks_cluster_auth.cluster.token
+}
+
+provider "helm" {
+  kubernetes {
+    host                   = module.eks.cluster_endpoint
+    cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+    token                  = data.aws_eks_cluster_auth.cluster.token
+  }
+}
+
+# Get cluster auth token
+data "aws_eks_cluster_auth" "cluster" {
+  name = module.eks.cluster_name
+}
+
 # ============================================================================
 # Local Values
 # ============================================================================
@@ -224,7 +243,7 @@ module "secrets_manager" {
 module "k8s_csi_driver" {
   source = "../../modules/k8s-csi-driver"
 
-  enabled             = true
+  enabled             = false  # Disabled - wegen K8s Provider Issue
   cluster_name        = module.eks.cluster_name
   oidc_provider_arn   = module.eks.oidc_provider_arn
   oidc_provider_url   = module.eks.oidc_provider_url
@@ -276,6 +295,8 @@ module "rabbitmq" {
   tags = merge(var.common_tags, {
     Environment = "development"
   })
+
+  depends_on = [module.eks]
 }
 
 # ============================================================================
