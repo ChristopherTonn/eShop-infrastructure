@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# eShop Re-Deployment Script - Production Ready Version
-# Automates clean setup of complete infrastructure without bucket conflicts
+# eShop Re-Deployment Script - 2-Phase Infrastructure Deployment
+# Phase 1: AWS Infrastructure (VPC, EKS, RDS, ElastiCache, ECR)
+# Phase 2: Kubernetes Services (RabbitMQ, Prometheus, Grafana, Alertmanager, Fluent Bit)
 
 set -e  # Exit on errors
 
@@ -112,41 +113,38 @@ fi
 
 cd ..
 
-# 2. Main Infrastructure Deployment
-echo -e "${YELLOW}📋 Step 2: Main Infrastructure Deployment${NC}"
+# 2. PHASE 1: AWS Infrastructure Deployment (VPC, EKS, RDS, ElastiCache, ECR)
+echo -e "${YELLOW}📋 Step 2: PHASE 1 - AWS Infrastructure Deployment${NC}"
 cd envs/dev
 
-echo "  🔧 Initializing main terraform..."
+echo "  🔧 Initializing terraform..."
 terraform init -upgrade
 
 # Check backend status
 echo "  📋 Checking backend connectivity..."
 if ! terraform plan >/dev/null 2>&1; then
     echo "  ⚠️  Backend issues detected - fixing..."
-    # Force unlock if necessary
     LOCK_ID=$(terraform plan 2>&1 | grep -o "ID: [a-zA-Z0-9-]*" | cut -d' ' -f2 | head -1) || true
     if [[ -n "$LOCK_ID" ]]; then
         echo "  🔓 Unlocking state: $LOCK_ID"
         terraform force-unlock -force "$LOCK_ID" >/dev/null 2>&1 || true
     fi
-    # Reinitialize backend
     terraform init -backend=true -force-copy -reconfigure
 fi
 
 echo "  ✅ Backend ready"
-echo "  📋 Creating infrastructure plan..."
+echo "  📋 Creating Phase 1 infrastructure plan (AWS only)..."
 terraform validate
 terraform plan -out=tfplan
 
-echo "  🚀 Applying infrastructure changes..."
+echo "  🚀 Applying Phase 1: AWS Infrastructure..."
 retry_command terraform apply tfplan
-cd ../../../
 
-# 3. Configure EKS Cluster Access
-echo -e "${YELLOW}📋 Step 3: Configure EKS Access${NC}"
-cd terraform/envs/dev
-# Wait until EKS cluster is ready
-echo "  ⏳ Waiting for EKS cluster to be ready..."
+echo -e "${GREEN}✅ Phase 1 Complete: AWS Infrastructure deployed${NC}"
+echo ""
+
+# 2.1 Wait for EKS Cluster to be Ready
+echo -e "${YELLOW}📋 Step 2.1: Waiting for EKS Cluster to be Ready${NC}"
 CLUSTER_NAME=""
 RETRIES=0
 while [[ -z "$CLUSTER_NAME" && $RETRIES -lt 30 ]]; do
@@ -158,19 +156,73 @@ while [[ -z "$CLUSTER_NAME" && $RETRIES -lt 30 ]]; do
     fi
 done
 
-if [[ -n "$CLUSTER_NAME" ]]; then
-    echo "  🔗 Configuring kubectl for cluster: $CLUSTER_NAME"
-    retry_command aws eks update-kubeconfig --region eu-central-1 --name "$CLUSTER_NAME"
-    # Check cluster readiness
-    echo "  📋 Checking cluster readiness..."
-    kubectl cluster-info --request-timeout=10s || echo "  ⚠️  Cluster not fully ready yet, continuing..."
-else
+if [[ -z "$CLUSTER_NAME" ]]; then
     echo -e "${RED}  ❌ EKS cluster not accessible after 15 minutes${NC}"
     exit 1
 fi
 
-# 4. ECR Login
-echo -e "${YELLOW}📋 Step 4: ECR Login${NC}"
+echo -e "${GREEN}✅ EKS Cluster Ready: $CLUSTER_NAME${NC}"
+cd ../../../
+
+# 3. Configure EKS Cluster Access
+echo -e "${YELLOW}📋 Step 3: Configure EKS Access${NC}"
+cd terraform/envs/dev
+
+echo "  🔗 Configuring kubectl for cluster: $CLUSTER_NAME"
+retry_command aws eks update-kubeconfig --region eu-central-1 --name "$CLUSTER_NAME"
+
+# Check cluster readiness
+echo "  📋 Checking cluster readiness..."
+kubectl cluster-info --request-timeout=10s || echo "  ⚠️  Cluster not fully ready yet, continuing..."
+
+cd ../../../
+
+# 3.1 User Confirmation for Phase 2
+echo ""
+echo -e "${YELLOW}╔════════════════════════════════════════════════════╗${NC}"
+echo -e "${YELLOW}║ 🎯 PHASE 1 COMPLETE - Ready for Phase 2?          ║${NC}"
+echo -e "${YELLOW}╚════════════════════════════════════════════════════╝${NC}"
+echo ""
+echo "Phase 2 wird deployen:"
+echo "  • RabbitMQ (Message Broker)"
+echo "  • Prometheus & Grafana (Monitoring)"
+echo "  • Alertmanager (Alerts)"
+echo "  • Fluent Bit (Logging)"
+echo ""
+echo "Kosten Phase 2: +~$8-10/hour"
+echo ""
+read -p "Phase 2 jetzt starten? (y/n) " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo -e "${YELLOW}Phase 2 übersprungen. Starte später mit: bash infra/deploy.sh --phase2${NC}"
+    exit 0
+fi
+
+# 4. PHASE 2: Kubernetes Services Deployment
+echo ""
+echo -e "${YELLOW}📋 Step 4: PHASE 2 - Kubernetes Services Deployment${NC}"
+cd terraform/envs/dev
+
+echo "  🔧 Updating terraform configuration for Phase 2..."
+echo "  📝 Enabling K8s modules (RabbitMQ, Monitoring, Logging)..."
+
+# Update tfplan für Phase 2 mit enabled K8s-Services
+terraform plan \
+  -var="rabbitmq_enabled=true" \
+  -var="monitoring_enabled=true" \
+  -var="logging_enabled=true" \
+  -var="fluent_bit_enabled=true" \
+  -out=tfplan_phase2
+
+echo "  🚀 Applying Phase 2: Kubernetes Services..."
+retry_command terraform apply tfplan_phase2
+
+echo -e "${GREEN}✅ Phase 2 Complete: Kubernetes Services deployed${NC}"
+cd ../../../
+
+# 5. ECR Login
+echo -e "${YELLOW}📋 Step 5: ECR Login${NC}"
+cd terraform/envs/dev
 ECR_REGISTRY=""
 RETRIES=0
 while [[ -z "$ECR_REGISTRY" && $RETRIES -lt 10 ]]; do
@@ -190,8 +242,8 @@ else
     exit 1
 fi
 
-# 5. Build and Push Docker Images
-echo -e "${YELLOW}📋 Step 5: Build and Push Images${NC}"
+# 6. Build and Push Docker Images
+echo -e "${YELLOW}📋 Step 6: Build and Push Images${NC}"
 cd ../../../
 
 # Check if Docker is running
@@ -213,8 +265,8 @@ else
     exit 1
 fi
 
-# 6. Kubernetes Deployment
-echo -e "${YELLOW}📋 Step 6: Deploy to Kubernetes${NC}"
+# 7. Kubernetes Deployment
+echo -e "${YELLOW}📋 Step 7: Deploy to Kubernetes${NC}"
 
 # Check if kubectl works
 if ! kubectl cluster-info --request-timeout=10s >/dev/null 2>&1; then
@@ -311,13 +363,13 @@ MANIFEST
 echo "  🚀 Applying Kubernetes manifests..."
 retry_command kubectl apply -f eshop-deployment-dynamic.yaml
 
-# 7. Wait for Deployment
-echo -e "${YELLOW}📋 Step 7: Wait for Deployment${NC}"
+# 8. Wait for Deployment
+echo -e "${YELLOW}📋 Step 8: Wait for Deployment${NC}"
 echo "  ⏳ Waiting for deployment to complete..."
 retry_command kubectl rollout status deployment/eshop-webapp --timeout=600s
 
-# 8. Get Service URL
-echo -e "${YELLOW}📋 Step 8: Get Service URL${NC}"
+# 9. Get Service URL
+echo -e "${YELLOW}📋 Step 9: Get Service URL${NC}"
 echo "  ⏳ Waiting for LoadBalancer to get external IP..."
 EXTERNAL_IP=""
 RETRIES=0
@@ -351,6 +403,5 @@ else
 fi
 
 echo ""
-echo -e "${GREEN}🚀 Re-Deployment Script Completed Successfully!${NC}"
+echo -e "${GREEN}🚀 Deployment Script Completed Successfully!${NC}"
 echo -e "${GREEN}📊 Infrastructure Status: ✅ READY${NC}"
-echo -e "${GREEN}💰 Cost: ~$0.50/hour (remember to destroy when done)${NC}"
