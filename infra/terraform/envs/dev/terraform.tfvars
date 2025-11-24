@@ -46,6 +46,14 @@ rds_performance_insights_retention_period = 7
 rds_enable_enhanced_monitoring            = false  # Disabled for test (saves ~$1/day)
 rds_monitoring_interval                   = 60
 
+# SMTP Configuration for Alertmanager Email Notifications
+alertmanager_smtp_host     = "smtp.gmail.com"
+alertmanager_smtp_port     = 587
+alertmanager_smtp_user     = "your-email@gmail.com"  # Change to your email
+alertmanager_smtp_password = "your-app-password"     # Change to your app password
+alertmanager_email_from    = "alerts@eshop.de"
+alertmanager_email_to      = ["devops@eshop.de", "christopher.tonn@gmail.com"]
+
 # ElastiCache Configuration
 elasticache_engine_version             = "7.0"
 elasticache_num_cache_nodes            = 1
@@ -83,28 +91,33 @@ enable_monitoring = false # Disabled for test
 enable_backup     = false # Disabled for test
 enable_multi_az   = false # Single AZ for test
 
-# Monitoring Stack Configuration
-monitoring_enabled                    = false  # Disable Prometheus/Grafana (saves ~$25/h)
-alertmanager_enabled                  = false  # Disable alerts
-grafana_enabled                       = false  # Disable dashboards
+# Monitoring Stack Configuration - FULL E2E TESTING
+monitoring_enabled                    = true   # Enable Prometheus/Grafana for testing
+alertmanager_enabled                  = true   # Enable alerts for testing (+$3.60/day)
+grafana_enabled                        = true   # Enable Grafana dashboards for testing
 prometheus_replica_count              = 1
-prometheus_retention_days             = 1      # Minimal retention
-node_exporter_enabled                 = false  # Disable node metrics (saves ~$3/h)
-kube_state_metrics_enabled            = false  # Disable k8s metrics (saves ~$2/h)
+prometheus_retention_days             = 1      # Minimal retention for test data
+node_exporter_enabled                 = false  # Disable node metrics (save costs)
+kube_state_metrics_enabled            = false  # Disable k8s metrics (save costs)
 
-# Logging Configuration
-logging_enabled                           = false  # Disable CloudWatch logs (saves ~$10/h)
-fluent_bit_enabled                       = false  # Disable log forwarding
-cloudwatch_log_retention_days             = 1      # Minimal if enabled
-fluent_bit_enable_container_insights     = false  # Disable Container Insights
-fluent_bit_enable_multiline_parsing      = false
+# Logging Configuration - FULL E2E TESTING
+logging_enabled                           = true   # Enable CloudWatch logs for testing (+$16.80/day)
+fluent_bit_enabled                       = true   # Enable log forwarding
+cloudwatch_log_retention_days             = 1      # Minimal retention
+fluent_bit_enable_container_insights     = false  # Disable Container Insights (save costs)
+fluent_bit_enable_multiline_parsing      = true   # Enable for better log parsing
 
 # Backup Configuration - OPTIMIZED FOR TESTING
 rds_skip_final_snapshot = true # Skip final snapshot (ephemeral test environment)
 
-# COST SUMMARY FOR THIS TEST:
+# COST SUMMARY FOR FULL E2E TEST WITH MONITORING, ALERTS & LOGGING:
 # EKS (1 t3.medium): ~$0.033/h
 # RDS (db.t3.micro, no backups): ~$0.005/h
 # ElastiCache (cache.t3.micro): ~$0.007/h
 # ALB + NAT: ~$0.020/h
-# TOTAL: ~$0.065/h = ~$1.56/day = ~$7.80 for 5-day test
+# Prometheus + Grafana: ~$8-10/h
+# Alertmanager: ~$0.15/h
+# CloudWatch Logs + Fluent Bit: ~$0.70/h
+# ─────────────────────────────────
+# TOTAL: ~$8.8-10.8/h = ~$211-259/day for comprehensive E2E test
+# 5-day test: ~$1055-1295 (validation of complete observability stack)
