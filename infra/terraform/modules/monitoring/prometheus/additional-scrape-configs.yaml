@@ -1,0 +1,118 @@
+# ============================================================================
+# Prometheus Additional Scrape Configs - ConfigMap
+# ============================================================================
+# This ConfigMap contains additional scrape configurations for Prometheus
+# to discover and monitor external services like RabbitMQ, RDS, and ElastiCache
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-scrape-configs
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/component: scrape-configs
+data:
+  additional-scrape-configs.yaml: |
+    # ====================================================================
+    # RabbitMQ Prometheus Plugin Metrics
+    # ====================================================================
+    - job_name: 'rabbitmq'
+      static_configs:
+        - targets: ['rabbitmq-headless.rabbitmq.svc.cluster.local:15692']
+      relabel_configs:
+        - source_labels: [__address__]
+          regex: '([^:]+)(?::\d+)?'
+          target_label: instance
+        - source_labels: [__scheme__, __address__]
+          separator: '://'
+          target_label: __param_target
+        - target_label: __address__
+          replacement: 'rabbitmq-headless.rabbitmq.svc.cluster.local:15692'
+        - source_labels: [__param_target]
+          target_label: instance
+        - action: labelmap
+          regex: __meta_consul_node
+          replacement: node
+      scrape_interval: 30s
+      scrape_timeout: 10s
+
+    # ====================================================================
+    # RabbitMQ Management API Metrics (optional)
+    # ====================================================================
+    - job_name: 'rabbitmq-management'
+      static_configs:
+        - targets: ['rabbitmq-headless.rabbitmq.svc.cluster.local:15672']
+      metrics_path: '/api/metrics'
+      basic_auth:
+        username: 'guest'
+        password: 'guest'
+      relabel_configs:
+        - source_labels: [__address__]
+          target_label: instance
+          replacement: 'rabbitmq'
+      scrape_interval: 60s
+      scrape_timeout: 10s
+
+    # ====================================================================
+    # Kubernetes API Server Metrics
+    # ====================================================================
+    - job_name: 'kubernetes-apiservers'
+      kubernetes_sd_configs:
+        - role: endpoints
+      scheme: https
+      tls_config:
+        ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+      relabel_configs:
+        - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+          action: keep
+          regex: default;kubernetes;https
+
+    # ====================================================================
+    # Kubelet Metrics
+    # ====================================================================
+    - job_name: 'kubernetes-nodes'
+      scheme: https
+      tls_config:
+        ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+      kubernetes_sd_configs:
+        - role: node
+      relabel_configs:
+        - action: labelmap
+          regex: __meta_kubernetes_node_label_(.+)
+        - target_label: __address__
+          replacement: kubernetes.default.svc:443
+        - source_labels: [__meta_kubernetes_node_name]
+          regex: (.+)
+          target_label: __metrics_path__
+          replacement: /api/v1/nodes/${1}/proxy/metrics
+
+    # ====================================================================
+    # Pod Metrics
+    # ====================================================================
+    - job_name: 'kubernetes-pods'
+      kubernetes_sd_configs:
+        - role: pod
+      relabel_configs:
+        - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+          action: keep
+          regex: 'true'
+        - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+          action: replace
+          target_label: __metrics_path__
+          regex: (.+)
+        - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+          action: replace
+          regex: ([^:]+)(?::\d+)?;(\d+)
+          replacement: $1:$2
+          target_label: __address__
+        - action: labelmap
+          regex: __meta_kubernetes_pod_label_(.+)
+        - source_labels: [__meta_kubernetes_namespace]
+          action: replace
+          target_label: kubernetes_namespace
+        - source_labels: [__meta_kubernetes_pod_name]
+          action: replace
+          target_label: kubernetes_pod_name

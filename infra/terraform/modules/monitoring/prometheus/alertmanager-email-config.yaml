@@ -1,0 +1,261 @@
+# ============================================================================
+# Alertmanager Configuration - Email Notifications
+# ============================================================================
+# Template for configuring email notifications in Alertmanager
+# This file is used by Terraform to generate the ConfigMap for Alertmanager
+
+global:
+  resolve_timeout: 5m
+  # SMTP Configuration for Email Notifications
+  smtp_smarthost: "${smtp_host}:${smtp_port}"
+  smtp_auth_username: "${smtp_user}"
+  smtp_auth_password: "${smtp_password}"
+  smtp_from: "${email_from}"
+  smtp_require_tls: true
+
+# Inhibition rules prevent sending notifications for certain alerts
+# if other alerts are already being fired
+inhibit_rules:
+  # Don't send warning alerts if critical alert is already firing
+  - source_match:
+      severity: "critical"
+    target_match:
+      severity: "warning"
+    equal: ["alertname", "component"]
+
+  # Don't send info alerts if warning alert is already firing
+  - source_match:
+      severity: "warning"
+    target_match:
+      severity: "info"
+    equal: ["alertname", "component"]
+
+# Routing configuration: determines who receives which alerts
+route:
+  # Default receiver for alerts
+  receiver: "developers-email"
+
+  # Group alerts by these labels to avoid duplicate notifications
+  group_by: ["alertname", "component", "severity"]
+
+  # Wait before sending first notification (allows grouping multiple alerts)
+  group_wait: 10s
+
+  # Send additional notifications every interval for ongoing incidents
+  group_interval: 10m
+
+  # How often to send notifications for the same alert
+  repeat_interval: 4h
+
+  # Sub-routes for specific alert handling
+  routes:
+    # Critical alerts: immediate notification without batching
+    - match:
+        severity: critical
+      receiver: "critical-email"
+      group_wait: 0s # Send immediately
+      group_interval: 5m # Regroup every 5 minutes
+      repeat_interval: 1h # Remind every hour
+      continue: true # Also send to parent receiver
+
+    # Warning alerts: batch and send every 10 minutes
+    - match:
+        severity: warning
+      receiver: "developers-email"
+      group_wait: 10s
+      group_interval: 10m
+      repeat_interval: 4h
+      continue: true
+
+    # Info alerts: send every 24 hours (can be ignored if unwanted)
+    - match:
+        severity: info
+      receiver: "developers-email"
+      group_wait: 30s
+      group_interval: 24h
+      repeat_interval: 24h
+      continue: false
+
+# Receivers define how notifications are sent (email, webhook, etc.)
+receivers:
+  # Default receiver for all alerts
+  - name: "developers-email"
+    email_configs:
+      - to: "${email_to}"
+        headers:
+          Subject: "[{{ .GroupLabels.severity | upper }}] {{ .GroupLabels.alertname }} - {{ .Status }}"
+          X-Alert-Component: "{{ .GroupLabels.component }}"
+        html: |
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="UTF-8">
+            </head>
+            <body style="font-family: Arial, sans-serif; background-color: #f5f5f5; padding: 20px;">
+              <div style="background-color: white; padding: 20px; border-radius: 8px; max-width: 600px; margin: 0 auto;">
+                
+                <!-- Header -->
+                <h2 style="color: #333; margin-top: 0; border-bottom: 2px solid #4CAF50; padding-bottom: 10px;">
+                  🚨 Alert: {{ .GroupLabels.alertname }}
+                </h2>
+                
+                <!-- Summary -->
+                <div style="background-color: #f9f9f9; padding: 15px; border-left: 4px solid #{{ if eq .Status "firing" }}ff6b6b{{ else }}4CAF50{{ end }}; margin: 15px 0;">
+                  <p style="margin: 0; font-size: 14px; color: #666;">
+                    <strong>Status:</strong> <span style="color: #{{ if eq .Status "firing" }}ff6b6b{{ else }}4CAF50{{ end }}; font-weight: bold;">{{ .Status | upper }}</span>
+                  </p>
+                  <p style="margin: 5px 0; font-size: 14px; color: #666;">
+                    <strong>Severity:</strong> {{ .GroupLabels.severity | upper }}
+                  </p>
+                  <p style="margin: 5px 0; font-size: 14px; color: #666;">
+                    <strong>Component:</strong> {{ .GroupLabels.component }}
+                  </p>
+                </div>
+
+                <!-- Alerts Details -->
+                <h3 style="color: #333; font-size: 16px; margin-top: 20px; margin-bottom: 10px;">Affected Instances:</h3>
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                  <thead>
+                    <tr style="background-color: #f0f0f0;">
+                      <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Instance</th>
+                      <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Alert</th>
+                      <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Value</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {{ range .Alerts }}
+                    <tr style="border-bottom: 1px solid #eee;">
+                      <td style="padding: 8px; border: 1px solid #ddd;">{{ .Labels.instance | default "N/A" }}</td>
+                      <td style="padding: 8px; border: 1px solid #ddd;">{{ .Labels.alertname }}</td>
+                      <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace;">{{ .Values | default "N/A" }}</td>
+                    </tr>
+                    {{ end }}
+                  </tbody>
+                </table>
+
+                <!-- Annotations -->
+                <h3 style="color: #333; font-size: 16px; margin-top: 20px; margin-bottom: 10px;">Details:</h3>
+                {{ range .Alerts.Firing }}
+                <div style="background-color: #fff3cd; padding: 12px; border-radius: 4px; margin-bottom: 10px; border-left: 4px solid #ffc107;">
+                  <p style="margin: 0; font-weight: bold; color: #333;">{{ .Annotations.summary }}</p>
+                  <p style="margin: 8px 0 0 0; color: #666; font-size: 13px;">{{ .Annotations.description }}</p>
+                </div>
+                {{ end }}
+
+                <!-- Footer -->
+                <div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid #eee; font-size: 12px; color: #999;">
+                  <p style="margin: 0;">
+                    Time: {{ .GroupLabels.alertname }} at {{ now | date "2006-01-02 15:04:05 MST" }}
+                  </p>
+                  <p style="margin: 5px 0 0 0;">
+                    <a href="http://prometheus.example.com/alerts" style="color: #4CAF50; text-decoration: none;">View in Prometheus</a> | 
+                    <a href="http://grafana.example.com" style="color: #4CAF50; text-decoration: none;">View in Grafana</a>
+                  </p>
+                </div>
+
+              </div>
+            </body>
+          </html>
+        text: |
+          Alert: {{ .GroupLabels.alertname }}
+          Status: {{ .Status | upper }}
+          Severity: {{ .GroupLabels.severity | upper }}
+          Component: {{ .GroupLabels.component }}
+
+          {{ range .Alerts.Firing }}
+          Instance: {{ .Labels.instance | default "N/A" }}
+          Summary: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+
+          {{ end }}
+
+          Time: {{ now | date "2006-01-02 15:04:05 MST" }}
+
+  # Dedicated receiver for critical alerts (immediate, separate inbox)
+  - name: "critical-email"
+    email_configs:
+      - to: "${email_to}"
+        headers:
+          Subject: "🚨 CRITICAL: {{ .GroupLabels.alertname }} - IMMEDIATE ACTION REQUIRED"
+          X-Alert-Component: "{{ .GroupLabels.component }}"
+          X-Alert-Severity: "CRITICAL"
+        html: |
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="UTF-8">
+            </head>
+            <body style="font-family: Arial, sans-serif; background-color: #ffe0e0; padding: 20px;">
+              <div style="background-color: white; padding: 20px; border-radius: 8px; max-width: 600px; margin: 0 auto; border: 3px solid #ff6b6b;">
+                
+                <!-- Critical Header -->
+                <h1 style="color: #ff6b6b; margin: 0; text-align: center; font-size: 24px;">
+                  🚨 CRITICAL ALERT 🚨
+                </h1>
+                
+                <h2 style="color: #333; margin-top: 15px; text-align: center;">
+                  {{ .GroupLabels.alertname }}
+                </h2>
+                
+                <!-- Urgent Box -->
+                <div style="background-color: #ff6b6b; color: white; padding: 15px; border-radius: 4px; margin: 15px 0; text-align: center; font-weight: bold; font-size: 16px;">
+                  IMMEDIATE ACTION REQUIRED - SERVICE AFFECTED
+                </div>
+
+                <!-- Summary -->
+                <div style="background-color: #fff5f5; padding: 15px; border-left: 4px solid #ff6b6b; margin: 15px 0;">
+                  <p style="margin: 0; font-size: 14px;"><strong>Component:</strong> {{ .GroupLabels.component }}</p>
+                  <p style="margin: 5px 0; font-size: 14px;"><strong>Severity:</strong> <span style="color: #ff6b6b; font-weight: bold;">CRITICAL</span></p>
+                  <p style="margin: 5px 0; font-size: 14px;"><strong>Time:</strong> {{ now | date "2006-01-02 15:04:05 MST" }}</p>
+                </div>
+
+                <!-- Details -->
+                {{ range .Alerts.Firing }}
+                <div style="margin: 15px 0;">
+                  <h3 style="color: #333; margin: 0 0 10px 0; border-bottom: 1px solid #ff6b6b; padding-bottom: 5px;">
+                    {{ .Annotations.summary }}
+                  </h3>
+                  <p style="margin: 0; color: #666; font-size: 13px; line-height: 1.6;">
+                    {{ .Annotations.description }}
+                  </p>
+                  <p style="margin: 10px 0 0 0; font-family: monospace; background-color: #f5f5f5; padding: 10px; border-radius: 4px; font-size: 12px; color: #333;">
+                    Instance: {{ .Labels.instance | default "N/A" }}
+                  </p>
+                </div>
+                {{ end }}
+
+                <!-- Action Footer -->
+                <div style="margin-top: 30px; padding: 20px; background-color: #f9f9f9; border-radius: 4px; border-left: 4px solid #ff6b6b;">
+                  <h3 style="color: #ff6b6b; margin-top: 0;">Actions:</h3>
+                  <ol style="margin: 0; padding-left: 20px; color: #333;">
+                    <li>Review the alert details immediately</li>
+                    <li>Check Prometheus for metric details: <a href="http://prometheus.example.com/alerts" style="color: #4CAF50;">View Prometheus</a></li>
+                    <li>Check Grafana dashboards: <a href="http://grafana.example.com" style="color: #4CAF50;">View Grafana</a></li>
+                    <li>If service is down, initiate incident response procedures</li>
+                  </ol>
+                </div>
+
+                <!-- Contact Info -->
+                <div style="margin-top: 20px; padding-top: 15px; border-top: 2px solid #ff6b6b; font-size: 12px; color: #999;">
+                  <p style="margin: 0;">On-call engineer: Please respond immediately to this alert</p>
+                </div>
+
+              </div>
+            </body>
+          </html>
+        text: |
+          🚨 CRITICAL ALERT 🚨
+
+          Alert: {{ .GroupLabels.alertname }}
+          Severity: CRITICAL
+          Component: {{ .GroupLabels.component }}
+
+          IMMEDIATE ACTION REQUIRED
+
+          {{ range .Alerts.Firing }}
+          Summary: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Instance: {{ .Labels.instance | default "N/A" }}
+          {{ end }}
+
+          Time: {{ now | date "2006-01-02 15:04:05 MST" }}

@@ -279,8 +279,109 @@ module "rabbitmq" {
 }
 
 # ============================================================================
+# Monitoring Stack Module (Prometheus, Grafana, Alertmanager)
+# ============================================================================
+
+module "monitoring" {
+  count   = var.monitoring_enabled ? 1 : 0
+  source  = "../../modules/monitoring/prometheus"
+
+  namespace                   = "monitoring"
+  enabled                     = true
+  chart_version               = var.prometheus_chart_version
+  prometheus_replica_count    = var.prometheus_replica_count
+  retention_days              = var.prometheus_retention_days
+  storage_size                = var.prometheus_storage_size
+  scrape_interval             = var.prometheus_scrape_interval
+  evaluation_interval         = var.prometheus_evaluation_interval
+  prometheus_resources        = var.prometheus_resources
+  node_exporter_enabled       = var.node_exporter_enabled
+  kube_state_metrics_enabled  = var.kube_state_metrics_enabled
+  alertmanager_enabled        = var.alertmanager_enabled
+  grafana_enabled             = var.grafana_enabled
+  grafana_admin_password      = var.grafana_admin_password
+
+  # Email Notification Configuration
+  alertmanager_smtp_host     = var.alertmanager_smtp_host
+  alertmanager_smtp_port     = var.alertmanager_smtp_port
+  alertmanager_smtp_user     = var.alertmanager_smtp_user
+  alertmanager_smtp_password = var.alertmanager_smtp_password
+  alertmanager_email_from    = var.alertmanager_email_from
+  alertmanager_email_to      = var.alertmanager_email_to
+
+  external_labels = {
+    cluster     = "eshop-dev"
+    environment = "development"
+  }
+
+  tags = merge(var.common_tags, {
+    Environment = "development"
+  })
+
+  depends_on = [module.eks, module.rabbitmq]
+}
+
+# ============================================================================
+# CloudWatch Logging Module (Log Groups + IAM)
+# ============================================================================
+
+module "cloudwatch_logging" {
+  count   = var.logging_enabled ? 1 : 0
+  source  = "../../modules/logging/cloudwatch"
+
+  cluster_name           = module.eks.cluster_name
+  environment            = local.environment
+  region                 = var.aws_region
+  log_retention_days     = var.cloudwatch_log_retention_days
+  enable_kms_encryption  = var.cloudwatch_enable_kms_encryption
+  kms_key_arn            = var.cloudwatch_kms_key_arn
+  oidc_provider_arn      = module.eks.oidc_provider_arn
+  create_fluent_bit_role = var.fluent_bit_enabled
+
+  tags = merge(var.common_tags, {
+    Environment = "development"
+  })
+
+  depends_on = [module.eks]
+}
+
+# ============================================================================
+# Fluent Bit Helm Module (Log Forwarding DaemonSet)
+# ============================================================================
+
+module "fluent_bit" {
+  count   = var.fluent_bit_enabled ? 1 : 0
+  source  = "../../modules/logging/fluent-bit"
+
+  cluster_name                       = module.eks.cluster_name
+  environment                        = local.environment
+  region                             = var.aws_region
+  kubernetes_namespace               = "logging"
+  service_account_name               = "fluent-bit"
+  fluent_bit_enabled                 = true
+  fluent_bit_chart_version           = var.fluent_bit_chart_version
+  fluent_bit_image_tag               = var.fluent_bit_image_tag
+  cloudwatch_log_group_prefix        = "/aws/eks"
+  fluent_bit_role_arn                = var.logging_enabled ? module.cloudwatch_logging[0].fluent_bit_role_arn : ""
+  fluent_bit_resources               = var.fluent_bit_resources
+  buffer_size                        = var.fluent_bit_buffer_size
+  enable_container_insights          = var.fluent_bit_enable_container_insights
+  log_format_multiline               = var.fluent_bit_enable_multiline_parsing
+
+  tags = merge(var.common_tags, {
+    Environment = "development"
+  })
+
+  depends_on = [
+    module.eks,
+    module.cloudwatch_logging,
+  ]
+}
+
+# ============================================================================
 # Outputs
 # ============================================================================
+
 
 output "vpc_id" {
   description = "VPC ID"
@@ -348,5 +449,129 @@ output "k8s_csi_driver_status" {
     secrets_store_csi_driver = module.k8s_csi_driver.secrets_store_csi_driver_status
     ascp                     = module.k8s_csi_driver.ascp_status
     csi_driver_role_arn      = module.k8s_csi_driver.csi_driver_role_arn
+  }
+}
+
+# ============================================================================
+# Monitoring Stack Outputs
+# ============================================================================
+
+output "monitoring_enabled" {
+  description = "Whether monitoring stack is enabled"
+  value       = var.monitoring_enabled
+}
+
+output "prometheus_endpoint" {
+  description = "Prometheus server endpoint"
+  value       = var.monitoring_enabled ? module.monitoring[0].prometheus_endpoint : null
+}
+
+output "prometheus_url" {
+  description = "Full URL to access Prometheus"
+  value       = var.monitoring_enabled ? module.monitoring[0].prometheus_url : null
+}
+
+output "grafana_endpoint" {
+  description = "Grafana server endpoint"
+  value       = var.monitoring_enabled ? module.monitoring[0].grafana_endpoint : null
+}
+
+output "grafana_url" {
+  description = "Full URL to access Grafana"
+  value       = var.monitoring_enabled ? module.monitoring[0].grafana_url : null
+}
+
+output "grafana_admin_password" {
+  description = "Grafana admin password"
+  value       = var.monitoring_enabled ? module.monitoring[0].grafana_admin_password : null
+  sensitive   = true
+}
+
+output "alertmanager_endpoint" {
+  description = "Alertmanager server endpoint"
+  value       = var.monitoring_enabled ? module.monitoring[0].alertmanager_endpoint : null
+}
+
+output "alertmanager_url" {
+  description = "Full URL to access Alertmanager"
+  value       = var.monitoring_enabled ? module.monitoring[0].alertmanager_url : null
+}
+
+output "monitoring_namespace" {
+  description = "Kubernetes namespace for monitoring stack"
+  value       = var.monitoring_enabled ? module.monitoring[0].namespace : null
+}
+
+output "monitoring_deployment_info" {
+  description = "Summary of monitoring stack deployment"
+  value       = var.monitoring_enabled ? module.monitoring[0].deployment_info : null
+}
+
+# ============================================================================
+# CloudWatch Logging Outputs
+# ============================================================================
+
+output "logging_enabled" {
+  description = "Whether centralized logging is enabled"
+  value       = var.logging_enabled
+}
+
+output "cloudwatch_log_groups" {
+  description = "CloudWatch Log group names for services"
+  value       = var.logging_enabled ? module.cloudwatch_logging[0].log_group_names : {}
+}
+
+output "cloudwatch_log_group_arns" {
+  description = "CloudWatch Log group ARNs for services"
+  value       = var.logging_enabled ? module.cloudwatch_logging[0].log_group_arns : {}
+}
+
+output "cloudwatch_platform_log_group_name" {
+  description = "CloudWatch platform/system log group name"
+  value       = var.logging_enabled ? module.cloudwatch_logging[0].platform_log_group_name : null
+}
+
+output "cloudwatch_platform_log_group_arn" {
+  description = "CloudWatch platform/system log group ARN"
+  value       = var.logging_enabled ? module.cloudwatch_logging[0].platform_log_group_arn : null
+}
+
+output "fluent_bit_enabled" {
+  description = "Whether Fluent Bit log forwarding is enabled"
+  value       = var.fluent_bit_enabled
+}
+
+output "fluent_bit_namespace" {
+  description = "Kubernetes namespace for Fluent Bit"
+  value       = var.fluent_bit_enabled ? module.fluent_bit[0].fluent_bit_namespace : null
+}
+
+output "fluent_bit_service_account" {
+  description = "Kubernetes service account for Fluent Bit IRSA"
+  value       = var.fluent_bit_enabled ? module.fluent_bit[0].fluent_bit_service_account : null
+}
+
+output "fluent_bit_helm_release_status" {
+  description = "Status of Fluent Bit Helm release"
+  value       = var.fluent_bit_enabled ? module.fluent_bit[0].fluent_bit_helm_release_status : null
+}
+
+output "fluent_bit_deployment_info" {
+  description = "Summary of Fluent Bit deployment configuration"
+  value       = var.fluent_bit_enabled ? module.fluent_bit[0].deployment_info : null
+}
+
+output "logging_deployment_summary" {
+  description = "Complete summary of logging infrastructure deployment"
+  value = {
+    logging_enabled           = var.logging_enabled
+    cloudwatch_enabled        = var.logging_enabled
+    fluent_bit_enabled        = var.fluent_bit_enabled
+    log_retention_days        = var.cloudwatch_log_retention_days
+    kms_encryption_enabled    = var.cloudwatch_enable_kms_encryption
+    fluent_bit_namespace      = var.fluent_bit_enabled ? module.fluent_bit[0].fluent_bit_namespace : null
+    fluent_bit_service_account = var.fluent_bit_enabled ? module.fluent_bit[0].fluent_bit_service_account : null
+    cloudwatch_log_group_count = var.logging_enabled ? length(module.cloudwatch_logging[0].log_group_names) : 0
+    platform_log_group        = var.logging_enabled ? module.cloudwatch_logging[0].platform_log_group_name : null
   }
 }

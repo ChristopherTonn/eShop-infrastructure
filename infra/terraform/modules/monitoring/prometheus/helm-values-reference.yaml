@@ -1,0 +1,184 @@
+# ============================================================================
+# kube-prometheus-stack Helm Values - eShop Development
+# ============================================================================
+# Reference configuration for kube-prometheus-stack Helm chart
+# This shows additional customization options beyond Terraform variables
+
+# Prometheus Operator
+prometheusOperator:
+  enabled: true
+  manageCrds: true
+  namespace: monitoring
+
+# Prometheus Configuration
+prometheus:
+  enabled: true
+
+  prometheusSpec:
+    # Replicas
+    replicas: 1
+
+    # Retention
+    retention: 15d
+
+    # Storage
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp2
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+
+    # Resources
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+
+    # Scrape Configuration
+    scrapeInterval: 30s
+    evaluationInterval: 30s
+
+    # Service Discovery
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+
+    # External Labels
+    externalLabels:
+      cluster: eshop-dev
+      environment: development
+
+    # Security Context
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      fsGroup: 2000
+
+# Grafana
+grafana:
+  enabled: true
+
+  # Admin Credentials
+  adminPassword: admin # Will be overridden by Terraform
+
+  # Service
+  service:
+    type: ClusterIP
+    port: 80
+
+  # DataSources - Prometheus wird automatisch hinzugefügt
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+        - name: Prometheus
+          type: prometheus
+          url: http://kube-prometheus-stack.monitoring.svc.cluster.local:9090
+          isDefault: true
+
+  # Dashboards - Provisioning
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: "default"
+          orgId: 1
+          folder: ""
+          type: file
+          disableDeletion: false
+          updateIntervalSeconds: 10
+          allowUiUpdates: true
+          options:
+            path: /var/lib/grafana/dashboards/default
+
+# Alertmanager
+alertmanager:
+  enabled: true
+
+  alertmanagerSpec:
+    replicas: 1
+
+    # Storage
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp2
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 1Gi
+
+    # Resources
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  # Configuration
+  config:
+    global:
+      resolve_timeout: 5m
+
+    route:
+      group_by: ["alertname", "cluster", "service"]
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 12h
+      receiver: "default"
+      routes:
+        - match:
+            severity: critical
+          receiver: critical
+          group_wait: 10s
+          repeat_interval: 1h
+
+    receivers:
+      - name: "default"
+      - name: "critical"
+
+# Node Exporter
+nodeExporter:
+  enabled: true
+
+# Kube State Metrics
+kubeStateMetrics:
+  enabled: true
+
+# Prometheus Node Exporter (DaemonSet für Hardware Metriken)
+prometheus-node-exporter:
+  enabled: true
+  hostNetwork: true
+  hostPID: true
+
+# Kube-Control-Plane Monitoring
+kubeControlPlane:
+  enabled: true
+
+# Kubelet Monitoring
+kubelet:
+  enabled: true
+  namespace: kube-system
+
+# Additional Service Monitors
+serviceMonitors:
+  enabled: true
+  # Custom service monitors können hier definiert werden
+
+# Pod Monitors
+podMonitors:
+  enabled: true
+  # Custom pod monitors können hier definiert werden
+
+# Prometheus Rules (Alert Rules)
+prometheusRules:
+  enabled: true
+  # Rules werden via kubernetes_manifest.prometheus_rules definiert

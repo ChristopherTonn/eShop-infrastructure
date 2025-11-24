@@ -1,0 +1,92 @@
+# ============================================================================
+# eShop Development Environment - Terraform Variables Example
+# ============================================================================
+# Copy this file to terraform.tfvars and adjust values as needed
+
+# AWS Configuration
+aws_region     = "eu-central-1"
+project_name   = "eshop"
+common_tags = {
+  Project     = "eShop"
+  Environment = "development"
+  Terraform   = "true"
+  ManagedBy   = "Terraform"
+  Owner       = "DevOps"
+  CostCenter  = "Development"
+}
+
+availability_zones = ["eu-central-1a", "eu-central-1b"]
+
+# VPC Configuration
+enable_vpc_flow_logs = false
+
+# EKS Configuration
+eks_cluster_version = "1.28"
+
+# RDS Configuration
+rds_engine_version            = "15.3"
+rds_master_username           = "postgres"
+rds_master_password           = "CHANGE_ME_SecurePassword123!"
+rds_backup_retention_period   = 7
+rds_skip_final_snapshot       = false
+
+# ElastiCache Configuration
+elasticache_engine_version     = "7.0"
+elasticache_num_cache_nodes    = 1
+
+# Secrets Configuration
+jwt_signing_secret   = "CHANGE_ME_JWTSecretKey123!"
+redis_password       = "CHANGE_ME_RedisPassword123!"
+rabbitmq_username    = "rabbitmq_user"
+rabbitmq_password    = "CHANGE_ME_RabbitMQPassword123!"
+api_keys            = {}
+additional_secrets  = {}
+secrets_kms_key_id  = null
+
+# RabbitMQ Configuration
+rabbitmq_enabled       = true
+rabbitmq_chart_version = "13.0.0"
+rabbitmq_replica_count = 1
+rabbitmq_storage_size  = "5Gi"
+rabbitmq_resources = {
+  requests = {
+    cpu    = "100m"
+    memory = "256Mi"
+  }
+  limits = {
+    cpu    = "500m"
+    memory = "512Mi"
+  }
+}
+
+# ============================================================================
+# Monitoring Stack Configuration
+# ============================================================================
+monitoring_enabled = true
+
+prometheus_chart_version      = "25.3.1"
+prometheus_replica_count      = 1
+prometheus_retention_days      = 15
+prometheus_storage_size        = "10Gi"
+prometheus_scrape_interval     = 30
+prometheus_evaluation_interval = 30
+prometheus_resources = {
+  requests = {
+    cpu    = "250m"
+    memory = "512Mi"
+  }
+  limits = {
+    cpu    = "1000m"
+    memory = "2Gi"
+  }
+}
+
+# Feature Toggles for Monitoring Components
+node_exporter_enabled         = true
+kube_state_metrics_enabled    = true
+alertmanager_enabled          = true
+grafana_enabled               = true
+
+# Grafana Configuration
+# Leave empty to auto-generate a random password
+grafana_admin_password = ""

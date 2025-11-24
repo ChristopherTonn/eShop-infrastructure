@@ -13,7 +13,7 @@ The eShop project uses the following technologies for environment and secrets ma
 
 ## 1. Architecture Overview
 
-```
+```mermaid
 ┌─────────────────────────────────────────────────────────────┐
 │                    GitHub Actions Workflow                   │
 ├─────────────────────────────────────────────────────────────┤
@@ -39,10 +39,10 @@ The eShop project uses the following technologies for environment and secrets ma
 
 These secrets are required for all environments:
 
-| Secret | Description | Security |
-|--------|------------|-----------|
-| `AWS_ACCOUNT_ID` | AWS Account ID (12 digits) | Publicly readable |
-| `AWS_ROLE_ARN` | ARN of GitHub Actions IAM Role | Publicly readable |
+| Secret           | Description                    | Security          |
+| ---------------- | ------------------------------ | ----------------- |
+| `AWS_ACCOUNT_ID` | AWS Account ID (12 digits)     | Publicly readable |
+| `AWS_ROLE_ARN`   | ARN of GitHub Actions IAM Role | Publicly readable |
 
 **Setup:**
 
@@ -60,7 +60,7 @@ Deployment Branch: `develop`
 
 **Public Environment Variables:**
 
-```
+```bash
 AWS_REGION=eu-central-1
 ENVIRONMENT=dev
 ECR_REGISTRY_PREFIX=dev
@@ -74,7 +74,7 @@ TERRAFORM_WORKSPACE=dev
 
 **Environment Secrets (encrypted):**
 
-```
+```bash
 AWS_DEV_ROLE_ARN          # IAM Role for Dev deployments
 AWS_ECR_REPOSITORY        # ECR Repository Name
 KUBE_CONFIG_DEV          # Base64-encoded kubeconfig
@@ -87,7 +87,7 @@ SLACK_WEBHOOK_URL        # Optional: Slack notifications
 
 All secrets follow this naming pattern: `eshop-{environment}/{service}/{secret-type}`
 
-```
+```text
 eshop-dev/
 ├── rds/
 │   └── credentials          # {username, password}
@@ -117,19 +117,19 @@ The `secrets-manager` module creates and manages all secrets:
 ```hcl
 module "secrets_manager" {
   source = "../../modules/secrets-manager"
-  
+
   environment = "dev"
   name_prefix = "eshop-dev"
-  
+
   # Credentials
   rds_username  = "postgres"
   rds_password  = var.rds_master_password
-  
+
   jwt_secret = var.jwt_signing_secret
-  
+
   rabbitmq_username = "guest"
   rabbitmq_password = var.rabbitmq_password
-  
+
   tags = {
     Environment = "development"
   }
@@ -141,6 +141,7 @@ module "secrets_manager" {
 ### 4.1 Installation
 
 The CSI Driver module installs and configures:
+
 - **Secrets Store CSI Driver**: Kubernetes component for secret mounting
 - **AWS Secrets Store Provider**: AWS-specific provider
 - **IRSA Service Account**: IAM role for pod access
@@ -168,22 +169,23 @@ spec:
 
 ```yaml
 containers:
-- name: basket-api
-  volumeMounts:
-  - name: rds-secrets
-    mountPath: /mnt/secrets/rds
-    readOnly: true
+  - name: basket-api
+    volumeMounts:
+      - name: rds-secrets
+        mountPath: /mnt/secrets/rds
+        readOnly: true
 
 volumes:
-- name: rds-secrets
-  csi:
-    driver: secrets-store.csi.k8s.io
-    readOnly: true
-    volumeAttributes:
-      secretProviderClass: "eshop-rds-secrets"
+  - name: rds-secrets
+    csi:
+      driver: secrets-store.csi.k8s.io
+      readOnly: true
+      volumeAttributes:
+        secretProviderClass: "eshop-rds-secrets"
 ```
 
-**Files:** 
+**Files:**
+
 - `/infra/k8s/secrets-provider-classes.yaml` - SecretProviderClass Definitions
 - `/infra/k8s/example-pod-with-secrets.yaml` - Pod example
 
@@ -272,32 +274,38 @@ Application reads from volume
 ### Initialization
 
 - [ ] **Execute Bootstrap Terraform**
+
   ```bash
   cd infra/terraform/bootstrap && terraform apply
   ```
 
 - [ ] **Set GitHub Secrets**
+
   ```bash
   .github/scripts/setup-environments.sh
   ```
 
 - [ ] **Configure AWS IAM OIDC Provider**
+
   - OIDC Provider for `token.actions.githubusercontent.com`
   - Create GitHub Actions Role
 
 - [ ] **Add Dev Environment Secrets**
+
   - AWS_DEV_ROLE_ARN
   - AWS_ECR_REPOSITORY
   - KUBE_CONFIG_DEV
   - SLACK_WEBHOOK_URL (optional)
 
 - [ ] **Initialize AWS Secrets Manager Secrets**
+
   ```bash
   cd infra/terraform/envs/dev
   terraform apply
   ```
 
 - [ ] **Install K8s CSI Driver**
+
   - Create IAM Service Account
   - Deploy Secrets Store CSI Driver
   - Deploy AWS Secrets Store Provider
@@ -319,11 +327,13 @@ Application reads from volume
 ### Problem: "OIDC token not accepted"
 
 **Causes:**
+
 - OIDC Provider not configured
 - Repository URL not in Trusted Publisher
 - Token expired
 
 **Solution:**
+
 ```bash
 # Check OIDC Provider
 aws iam list-open-id-connect-providers
@@ -335,11 +345,13 @@ aws iam get-role-policy --role-name github-actions-role
 ### Problem: "CSI Driver mounting failed"
 
 **Causes:**
+
 - Pod has incorrect IAM Service Account
 - AWS Secrets Manager secret does not exist
 - Secret names do not match
 
 **Solution:**
+
 ```bash
 # Check CSI Driver logs
 kubectl logs -n kube-system -l app=secrets-store-csi-driver
@@ -354,11 +366,13 @@ aws secretsmanager describe-secret --secret-id eshop-dev/rds/credentials
 ### Problem: "ECR push failed"
 
 **Causes:**
+
 - AWS_ACCOUNT_ID not set
 - ECR Repository does not exist
 - Credentials expired
 
 **Solution:**
+
 ```bash
 # List ECR repositories
 aws ecr describe-repositories
@@ -373,6 +387,7 @@ aws iam get-role-policy --role-name github-actions-role --policy-name ecr-push-p
 ## 9. References
 
 - **Files:**
+
   - `.github/SECRETS_SETUP.md` - Secrets-Dokumentation
   - `.github/environments/dev.json` - Dev Environment Konfiguration
   - `.github/scripts/setup-environments.sh` - Setup-Script

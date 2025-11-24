@@ -191,3 +191,265 @@ variable "rabbitmq_resources" {
     }
   }
 }
+
+# ============================================================================
+# Monitoring Stack Configuration (Prometheus, Grafana, Alertmanager)
+# ============================================================================
+
+variable "monitoring_enabled" {
+  description = "Enable monitoring stack (Prometheus, Grafana, Alertmanager)"
+  type        = bool
+  default     = true
+}
+
+variable "prometheus_chart_version" {
+  description = "kube-prometheus-stack Helm chart version"
+  type        = string
+  default     = "25.3.1"
+}
+
+variable "prometheus_replica_count" {
+  description = "Number of Prometheus server replicas"
+  type        = number
+  default     = 1
+
+  validation {
+    condition     = var.prometheus_replica_count >= 1 && var.prometheus_replica_count <= 5
+    error_message = "Prometheus replica count must be between 1 and 5."
+  }
+}
+
+variable "prometheus_retention_days" {
+  description = "Prometheus metrics retention period in days"
+  type        = number
+  default     = 15
+
+  validation {
+    condition     = var.prometheus_retention_days >= 1 && var.prometheus_retention_days <= 365
+    error_message = "Retention period must be between 1 and 365 days."
+  }
+}
+
+variable "prometheus_storage_size" {
+  description = "Prometheus persistent volume size"
+  type        = string
+  default     = "10Gi"
+}
+
+variable "prometheus_scrape_interval" {
+  description = "Prometheus scrape interval in seconds"
+  type        = number
+  default     = 30
+
+  validation {
+    condition     = var.prometheus_scrape_interval >= 5 && var.prometheus_scrape_interval <= 300
+    error_message = "Scrape interval must be between 5 and 300 seconds."
+  }
+}
+
+variable "prometheus_evaluation_interval" {
+  description = "Prometheus evaluation interval for alert rules in seconds"
+  type        = number
+  default     = 30
+
+  validation {
+    condition     = var.prometheus_evaluation_interval >= 5 && var.prometheus_evaluation_interval <= 300
+    error_message = "Evaluation interval must be between 5 and 300 seconds."
+  }
+}
+
+variable "prometheus_resources" {
+  description = "Prometheus pod resource requests and limits"
+  type = object({
+    requests = object({
+      cpu    = string
+      memory = string
+    })
+    limits = object({
+      cpu    = string
+      memory = string
+    })
+  })
+  default = {
+    requests = {
+      cpu    = "250m"
+      memory = "512Mi"
+    }
+    limits = {
+      cpu    = "1000m"
+      memory = "2Gi"
+    }
+  }
+}
+
+variable "node_exporter_enabled" {
+  description = "Enable Node Exporter for hardware metrics"
+  type        = bool
+  default     = true
+}
+
+variable "kube_state_metrics_enabled" {
+  description = "Enable kube-state-metrics for Kubernetes metrics"
+  type        = bool
+  default     = true
+}
+
+variable "alertmanager_enabled" {
+  description = "Enable Alertmanager component"
+  type        = bool
+  default     = true
+}
+
+variable "grafana_enabled" {
+  description = "Enable Grafana component"
+  type        = bool
+  default     = true
+}
+
+variable "grafana_admin_password" {
+  description = "Grafana admin password (randomly generated if not provided)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+# ============================================================================
+# Logging Configuration (CloudWatch + Fluent Bit)
+# ============================================================================
+
+variable "logging_enabled" {
+  description = "Enable centralized logging with CloudWatch and Fluent Bit"
+  type        = bool
+  default     = true
+}
+
+variable "cloudwatch_log_retention_days" {
+  description = "CloudWatch Logs retention period in days"
+  type        = number
+  default     = 7
+
+  validation {
+    condition     = contains([1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, 3653], var.cloudwatch_log_retention_days)
+    error_message = "Log retention days must be a valid CloudWatch value."
+  }
+}
+
+variable "cloudwatch_enable_kms_encryption" {
+  description = "Enable KMS encryption for CloudWatch Logs"
+  type        = bool
+  default     = false
+}
+
+variable "cloudwatch_kms_key_arn" {
+  description = "KMS key ARN for CloudWatch Logs encryption"
+  type        = string
+  default     = ""
+}
+
+variable "fluent_bit_enabled" {
+  description = "Enable Fluent Bit DaemonSet for log forwarding"
+  type        = bool
+  default     = true
+}
+
+variable "fluent_bit_chart_version" {
+  description = "Fluent Bit Helm chart version"
+  type        = string
+  default     = "0.21.0"
+}
+
+variable "fluent_bit_image_tag" {
+  description = "Fluent Bit image tag"
+  type        = string
+  default     = "2.1.8"
+}
+
+variable "fluent_bit_resources" {
+  description = "Fluent Bit pod resource requests and limits"
+  type = object({
+    requests = object({
+      cpu    = string
+      memory = string
+    })
+    limits = object({
+      cpu    = string
+      memory = string
+    })
+  })
+  default = {
+    requests = {
+      cpu    = "100m"
+      memory = "128Mi"
+    }
+    limits = {
+      cpu    = "500m"
+      memory = "512Mi"
+    }
+  }
+}
+
+variable "fluent_bit_buffer_size" {
+  description = "Fluent Bit buffer size limit"
+  type        = string
+  default     = "32m"
+}
+
+variable "fluent_bit_enable_container_insights" {
+  description = "Enable CloudWatch Container Insights formatting"
+  type        = bool
+  default     = true
+}
+
+variable "fluent_bit_enable_multiline_parsing" {
+  description = "Enable multiline log parsing for exception messages"
+  type        = bool
+  default     = true
+}
+
+# ============================================================================
+# Alertmanager Email Notification Configuration
+# ============================================================================
+
+variable "alertmanager_email_from" {
+  description = "Email address to send alerts from"
+  type        = string
+  default     = "alerts@eshop.de"
+}
+
+variable "alertmanager_email_to" {
+  description = "List of email addresses to send alerts to"
+  type        = list(string)
+  sensitive   = true
+  default     = ["devops@eshop.de", "christopher.tonn@gmail.com"]
+}
+
+variable "alertmanager_smtp_host" {
+  description = "SMTP server hostname (e.g., smtp.gmail.com, smtp.office365.com)"
+  type        = string
+  default     = "smtp.gmail.com"
+}
+
+variable "alertmanager_smtp_port" {
+  description = "SMTP server port"
+  type        = number
+  default     = 587
+}
+
+variable "alertmanager_smtp_user" {
+  description = "SMTP username for authentication"
+  type        = string
+  sensitive   = true
+}
+
+variable "alertmanager_smtp_password" {
+  description = "SMTP password for authentication"
+  type        = string
+  sensitive   = true
+}
+
+variable "alertmanager_enabled" {
+  description = "Enable Alertmanager with email notifications"
+  type        = bool
+  default     = true
+}
+
