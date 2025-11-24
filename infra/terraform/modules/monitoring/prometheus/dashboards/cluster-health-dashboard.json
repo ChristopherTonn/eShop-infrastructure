@@ -67,9 +67,7 @@
         "reduceOptions": {
           "values": false,
           "fields": "",
-          "calcs": [
-            "lastNotNull"
-          ]
+          "calcs": ["lastNotNull"]
         },
         "text": {}
       },
@@ -133,9 +131,7 @@
         "reduceOptions": {
           "values": false,
           "fields": "",
-          "calcs": [
-            "lastNotNull"
-          ]
+          "calcs": ["lastNotNull"]
         },
         "text": {}
       },
@@ -199,9 +195,7 @@
         "reduceOptions": {
           "values": false,
           "fields": "",
-          "calcs": [
-            "lastNotNull"
-          ]
+          "calcs": ["lastNotNull"]
         },
         "text": {}
       },
@@ -367,10 +361,7 @@
       "id": 44,
       "options": {
         "legend": {
-          "calcs": [
-            "mean",
-            "max"
-          ],
+          "calcs": ["mean", "max"],
           "displayMode": "table",
           "placement": "right"
         },
@@ -474,11 +465,7 @@
   "refresh": "30s",
   "schemaVersion": 27,
   "style": "dark",
-  "tags": [
-    "cluster",
-    "health",
-    "eshop"
-  ],
+  "tags": ["cluster", "health", "eshop"],
   "templating": {
     "list": []
   },

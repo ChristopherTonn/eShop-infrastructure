@@ -18,12 +18,14 @@ This module provides:
 **Purpose**: Monitor EKS cluster node and resource health
 
 **Metrics**:
+
 - Node CPU Usage (%) - identifies resource-constrained nodes
 - Node Memory Usage (%) - monitors memory pressure
 - Running Pods per Node - load distribution tracking
 - Network I/O (Receive) - bandwidth utilization
 
 **Use Cases**:
+
 - Detect node overload or resource exhaustion
 - Plan capacity scaling
 - Identify network bottlenecks
@@ -37,12 +39,14 @@ This module provides:
 **Purpose**: Monitor API services and application health
 
 **Metrics**:
+
 - Request Throughput by Service (req/s) - API load analysis
 - Response Latency (P95/P99) - end-user experience tracking
 - Error Rate by Service (%) - application stability
 - HTTP Status Code Distribution - request outcome breakdown
 
 **Services Monitored**:
+
 - basket-api
 - catalog-api
 - ordering-api
@@ -50,6 +54,7 @@ This module provides:
 - webhooks-api
 
 **Use Cases**:
+
 - Track API performance degradation
 - Identify slow endpoints
 - Monitor error rates and anomalies
@@ -64,18 +69,21 @@ This module provides:
 **Purpose**: Monitor message broker health and throughput
 
 **Metrics**:
+
 - Queue Depth (Ready Messages) - message backlog tracking
 - Message Rate (Delivered/Redelivered) - throughput analysis
 - Connections & Channels - connection pool status
 - Memory Usage - broker resource utilization
 
 **Thresholds**:
+
 - Queue Depth Warning: > 5,000 messages
 - Queue Depth Critical: > 10,000 messages
 - Memory Usage Warning: > 70%
 - Memory Usage Critical: > 90%
 
 **Use Cases**:
+
 - Detect message processing bottlenecks
 - Monitor consumer lag
 - Capacity planning for queue systems
@@ -90,18 +98,21 @@ This module provides:
 **Purpose**: Monitor PostgreSQL performance and health
 
 **Metrics**:
+
 - Active Connections by Database - connection pool monitoring
 - Query Rate (DML) - insert/update/delete operations
 - Slow Query Rate - queries exceeding 1 second threshold
 - Cache Hit Ratio - memory efficiency
 
 **Thresholds**:
+
 - Active Connections Warning: > 80 connections
 - Active Connections Critical: > 90 connections
 - Cache Hit Ratio Target: > 98%
 - Cache Hit Ratio Warning: < 95%
 
 **Use Cases**:
+
 - Identify N+1 query problems
 - Optimize slow queries
 - Monitor index effectiveness
@@ -116,12 +127,14 @@ This module provides:
 **Purpose**: Overall cluster status and pod lifecycle monitoring
 
 **Metrics**:
+
 - Service Status (Kubernetes API, RabbitMQ, PostgreSQL) - critical component health
 - Pod Status by Namespace - running/pending/failed breakdown
 - Pod Restart Rate (Last Hour) - stability indicator
 - Node Status Overview - ready/not-ready nodes
 
 **Use Cases**:
+
 - Quick cluster health check
 - Identify unstable services
 - Detect CrashLoopBackOff pods
@@ -139,35 +152,35 @@ These alerts are sent immediately when triggered.
 
 #### Infrastructure Alerts
 
-| Alert Name | Condition | Action |
-|-----------|-----------|--------|
+| Alert Name                    | Condition                               | Action                                  |
+| ----------------------------- | --------------------------------------- | --------------------------------------- |
 | **KubernetesPodCrashLooping** | Pod restarting > 0.1 times/min for 5min | Check pod logs, investigate crash cause |
-| **KubernetesNodeNotReady** | Node ready condition = false for 5min | SSH to node, check kubelet status |
-| **ServiceDown** | Service health check failing for 5min | Restart service, check pod logs |
-| **PostgreSQLDown** | PostgreSQL not responding for 5min | Check database logs, failover if HA |
-| **RabbitMQDown** | RabbitMQ not responding for 5min | Restart RabbitMQ, check disk space |
+| **KubernetesNodeNotReady**    | Node ready condition = false for 5min   | SSH to node, check kubelet status       |
+| **ServiceDown**               | Service health check failing for 5min   | Restart service, check pod logs         |
+| **PostgreSQLDown**            | PostgreSQL not responding for 5min      | Check database logs, failover if HA     |
+| **RabbitMQDown**              | RabbitMQ not responding for 5min        | Restart RabbitMQ, check disk space      |
 
 #### Application Alerts
 
-| Alert Name | Condition | Action |
-|-----------|-----------|--------|
-| **HighErrorRate** | Error rate > 5% for 5min | Check service logs, review recent deployments |
-| **HighLatency** | P95 latency > 1 second for 10min | Check resource usage, investigate slow queries |
-| **RabbitMQQueueDepthHigh** | Queue depth > 10,000 for 5min | Increase consumer instances, check for blocking |
+| Alert Name                 | Condition                        | Action                                          |
+| -------------------------- | -------------------------------- | ----------------------------------------------- |
+| **HighErrorRate**          | Error rate > 5% for 5min         | Check service logs, review recent deployments   |
+| **HighLatency**            | P95 latency > 1 second for 10min | Check resource usage, investigate slow queries  |
+| **RabbitMQQueueDepthHigh** | Queue depth > 10,000 for 5min    | Increase consumer instances, check for blocking |
 
 ### Warning Alerts (Batched Every 10 Minutes)
 
 Multiple warning alerts are grouped and sent once per 10-minute interval.
 
-| Alert Name | Condition | Action |
-|-----------|-----------|--------|
-| **KubernetesPodNotHealthy** | Pod in Pending/Failed state > 15min | Check resource requests, node capacity |
-| **ContainerCpuUsageHigh** | CPU usage > 90% for 10min | Optimize code or scale horizontally |
-| **ContainerMemoryUsageHigh** | Memory usage > 90% for 10min | Adjust memory limits or scale |
-| **RabbitMQMemoryHigh** | RabbitMQ memory > 90% for 5min | Increase available memory or purge queues |
-| **PostgreSQLConnectionsHigh** | Active connections > 80 for 5min | Review connection pool config, increase limits |
-| **PostgreSQLSlowQueries** | Slow queries > 0.5/sec for 5min | Optimize slow queries, add indexes |
-| **HighRequestRate** | Request rate > 1000 req/s for 5min | Monitor for DDoS or load testing |
+| Alert Name                    | Condition                           | Action                                         |
+| ----------------------------- | ----------------------------------- | ---------------------------------------------- |
+| **KubernetesPodNotHealthy**   | Pod in Pending/Failed state > 15min | Check resource requests, node capacity         |
+| **ContainerCpuUsageHigh**     | CPU usage > 90% for 10min           | Optimize code or scale horizontally            |
+| **ContainerMemoryUsageHigh**  | Memory usage > 90% for 10min        | Adjust memory limits or scale                  |
+| **RabbitMQMemoryHigh**        | RabbitMQ memory > 90% for 5min      | Increase available memory or purge queues      |
+| **PostgreSQLConnectionsHigh** | Active connections > 80 for 5min    | Review connection pool config, increase limits |
+| **PostgreSQLSlowQueries**     | Slow queries > 0.5/sec for 5min     | Optimize slow queries, add indexes             |
+| **HighRequestRate**           | Request rate > 1000 req/s for 5min  | Monitor for DDoS or load testing               |
 
 ### Info Alerts (Suppressed)
 
@@ -225,6 +238,7 @@ alertmanager_smtp_password = "password"
 Subject: `🚨 CRITICAL: AlertName - IMMEDIATE ACTION REQUIRED`
 
 Content includes:
+
 - Alert name and severity badge
 - Affected service/pod/instance
 - Detailed description and annotation
@@ -256,6 +270,7 @@ Actions:
 Subject: `[WARNING] AlertName - Status: firing`
 
 Content includes:
+
 - Alert summary with color-coded severity
 - Table of affected instances
 - Detailed annotations
@@ -276,8 +291,8 @@ Content includes:
 ALERTS{severity="critical", alertstate="firing"}
 ```
 
-4. Set visualization to "Table"
-5. Save panel
+5. Set visualization to "Table"
+6. Save panel
 
 ### Create Alert Notification Channel
 
@@ -338,7 +353,7 @@ kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80
 
 ### Test Email Notifications
 
-1. Go to Prometheus: `kubectl port-forward -n monitoring svc/kube-prometheus-stack 9090:90`
+1. Go to Prometheus: `kubectl port-forward -n monitoring svc/kube-prometheus-stack 9090:9090`
 2. Navigate to `Alerts` tab
 3. Manually trigger test alert by querying:
 
@@ -409,8 +424,8 @@ If receiving too many alerts:
 1. Adjust grouping in `alertmanager-email-config.yaml`:
 
 ```yaml
-group_wait: 30s    # Wait 30 seconds before sending first alert
-group_interval: 15m  # Regroup every 15 minutes (instead of 10m)
+group_wait: 30s # Wait 30 seconds before sending first alert
+group_interval: 15m # Regroup every 15 minutes (instead of 10m)
 ```
 
 2. Reduce alert frequency by increasing `for` duration in alert rules

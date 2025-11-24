@@ -405,3 +405,51 @@ variable "fluent_bit_enable_multiline_parsing" {
   type        = bool
   default     = true
 }
+
+# ============================================================================
+# Alertmanager Email Notification Configuration
+# ============================================================================
+
+variable "alertmanager_email_from" {
+  description = "Email address to send alerts from"
+  type        = string
+  default     = "alerts@eshop.de"
+}
+
+variable "alertmanager_email_to" {
+  description = "List of email addresses to send alerts to"
+  type        = list(string)
+  sensitive   = true
+  default     = ["devops@eshop.de", "christopher.tonn@gmail.com"]
+}
+
+variable "alertmanager_smtp_host" {
+  description = "SMTP server hostname (e.g., smtp.gmail.com, smtp.office365.com)"
+  type        = string
+  default     = "smtp.gmail.com"
+}
+
+variable "alertmanager_smtp_port" {
+  description = "SMTP server port"
+  type        = number
+  default     = 587
+}
+
+variable "alertmanager_smtp_user" {
+  description = "SMTP username for authentication"
+  type        = string
+  sensitive   = true
+}
+
+variable "alertmanager_smtp_password" {
+  description = "SMTP password for authentication"
+  type        = string
+  sensitive   = true
+}
+
+variable "alertmanager_enabled" {
+  description = "Enable Alertmanager with email notifications"
+  type        = bool
+  default     = true
+}
+

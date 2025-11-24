@@ -20,7 +20,7 @@ spec:
       interval: 30s
       rules:
         - alert: KubernetesPodCrashLooping
-          expr: 'rate(kube_pod_container_status_restarts_total[15m]) > 0.1'
+          expr: "rate(kube_pod_container_status_restarts_total[15m]) > 0.1"
           for: 5m
           labels:
             severity: critical
@@ -76,7 +76,7 @@ spec:
       interval: 30s
       rules:
         - alert: RabbitMQDown
-          expr: 'rabbitmq_up == 0'
+          expr: "rabbitmq_up == 0"
           for: 5m
           labels:
             severity: critical
@@ -86,7 +86,7 @@ spec:
             description: "RabbitMQ instance {{ $labels.instance }} is down"
 
         - alert: RabbitMQMemoryHigh
-          expr: 'rabbitmq_process_resident_memory_bytes / rabbitmq_resident_memory_limit_bytes > 0.9'
+          expr: "rabbitmq_process_resident_memory_bytes / rabbitmq_resident_memory_limit_bytes > 0.9"
           for: 5m
           labels:
             severity: warning
@@ -96,7 +96,7 @@ spec:
             description: "RabbitMQ instance {{ $labels.instance }} memory usage is above 90%"
 
         - alert: RabbitMQUnackMessages
-          expr: 'rabbitmq_queue_messages_unacked > 1000'
+          expr: "rabbitmq_queue_messages_unacked > 1000"
           for: 5m
           labels:
             severity: warning
@@ -106,7 +106,7 @@ spec:
             description: "Queue {{ $labels.queue }} has {{ $value }} unacked messages"
 
         - alert: RabbitMQConnectionsHigh
-          expr: 'rabbitmq_connections > 100'
+          expr: "rabbitmq_connections > 100"
           for: 5m
           labels:
             severity: warning
@@ -116,7 +116,7 @@ spec:
             description: "RabbitMQ instance {{ $labels.instance }} has {{ $value }} connections"
 
         - alert: RabbitMQQueueDepthHigh
-          expr: 'rabbitmq_queue_messages_ready > 10000'
+          expr: "rabbitmq_queue_messages_ready > 10000"
           for: 5m
           labels:
             severity: warning
@@ -132,7 +132,7 @@ spec:
       interval: 30s
       rules:
         - alert: PostgreSQLDown
-          expr: 'pg_up == 0'
+          expr: "pg_up == 0"
           for: 5m
           labels:
             severity: critical
@@ -142,7 +142,7 @@ spec:
             description: "PostgreSQL instance {{ $labels.instance }} is not responding"
 
         - alert: PostgreSQLSlowQueries
-          expr: 'rate(pg_slow_queries_total[5m]) > 0.5'
+          expr: "rate(pg_slow_queries_total[5m]) > 0.5"
           for: 5m
           labels:
             severity: warning
@@ -152,7 +152,7 @@ spec:
             description: "PostgreSQL instance {{ $labels.instance }} has slow queries: {{ $value }} per second"
 
         - alert: PostgreSQLConnectionsHigh
-          expr: 'sum by (instance) (pg_stat_activity_count) > 80'
+          expr: "sum by (instance) (pg_stat_activity_count) > 80"
           for: 5m
           labels:
             severity: warning
@@ -162,7 +162,7 @@ spec:
             description: "PostgreSQL instance {{ $labels.instance }} has {{ $value }} active connections"
 
         - alert: PostgreSQLCacheMissRatio
-          expr: 'rate(pg_stat_database_blks_miss[5m]) / (rate(pg_stat_database_blks_read[5m]) + rate(pg_stat_database_blks_hit[5m])) > 0.05'
+          expr: "rate(pg_stat_database_blks_miss[5m]) / (rate(pg_stat_database_blks_read[5m]) + rate(pg_stat_database_blks_hit[5m])) > 0.05"
           for: 5m
           labels:
             severity: warning
@@ -198,7 +198,7 @@ spec:
             description: "Service {{ $labels.job }} has error rate of {{ $value | humanizePercentage }}"
 
         - alert: HighLatency
-          expr: 'histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1'
+          expr: "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1"
           for: 10m
           labels:
             severity: warning
@@ -208,7 +208,7 @@ spec:
             description: "Service {{ $labels.job }} P95 latency is {{ $value }}s"
 
         - alert: HighRequestRate
-          expr: 'rate(http_requests_total[5m]) > 1000'
+          expr: "rate(http_requests_total[5m]) > 1000"
           for: 5m
           labels:
             severity: info
@@ -224,7 +224,7 @@ spec:
       interval: 30s
       rules:
         - alert: ContainerCpuUsageHigh
-          expr: '(sum(rate(container_cpu_usage_seconds_total[5m])) by (pod_name, namespace) / sum(container_spec_cpu_quota/container_spec_cpu_period) by (pod_name, namespace)) > 0.9'
+          expr: "(sum(rate(container_cpu_usage_seconds_total[5m])) by (pod_name, namespace) / sum(container_spec_cpu_quota/container_spec_cpu_period) by (pod_name, namespace)) > 0.9"
           for: 10m
           labels:
             severity: warning
@@ -234,7 +234,7 @@ spec:
             description: "Container {{ $labels.pod_name }} CPU usage is above 90%"
 
         - alert: ContainerMemoryUsageHigh
-          expr: '(sum(container_memory_usage_bytes) by (pod_name, namespace) / sum(container_spec_memory_limit_bytes) by (pod_name, namespace)) > 0.9'
+          expr: "(sum(container_memory_usage_bytes) by (pod_name, namespace) / sum(container_spec_memory_limit_bytes) by (pod_name, namespace)) > 0.9"
           for: 10m
           labels:
             severity: warning
@@ -249,17 +249,17 @@ spec:
     - name: recording.rules
       interval: 30s
       rules:
-        - record: 'instance:node_cpu:rate5m'
+        - record: "instance:node_cpu:rate5m"
           expr: '100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)'
 
-        - record: 'instance:node_memory_utilisation:ratio'
-          expr: '1 - ((node_memory_MemAvailable_bytes / 1024 / 1024 / 1024) / (node_memory_MemTotal_bytes / 1024 / 1024 / 1024))'
+        - record: "instance:node_memory_utilisation:ratio"
+          expr: "1 - ((node_memory_MemAvailable_bytes / 1024 / 1024 / 1024) / (node_memory_MemTotal_bytes / 1024 / 1024 / 1024))"
 
-        - record: 'instance:node_filesystem_usage:ratio'
+        - record: "instance:node_filesystem_usage:ratio"
           expr: '(node_filesystem_size_bytes{fstype!~"tmpfs"} - node_filesystem_avail_bytes) / node_filesystem_size_bytes'
 
-        - record: 'kubernetes:container_memory_usage:sum'
+        - record: "kubernetes:container_memory_usage:sum"
           expr: 'sum by (namespace, pod) (container_memory_usage_bytes{pod!=""})'
 
-        - record: 'kubernetes:container_cpu_usage:sum'
+        - record: "kubernetes:container_cpu_usage:sum"
           expr: 'sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{pod!=""}[5m]))'

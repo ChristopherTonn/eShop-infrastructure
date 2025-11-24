@@ -52,7 +52,7 @@ Complete step-by-step guide for deploying, configuring, and operating the CloudW
 
 ### Deployment Layers
 
-```
+```text
 Layer 1: Applications
 ├── Basket API (logs to stdout)
 ├── Catalog API (logs to stdout)
@@ -95,7 +95,7 @@ Layer 5: AWS CloudWatch
 
 ### Log Flow Diagram
 
-```
+```mermaid
 ┌─────────────────────────────────────────────────────────────┐
 │            Kubernetes Node / Pod                            │
 ├─────────────────────────────────────────────────────────────┤
@@ -393,7 +393,7 @@ kubectl logs -n logging -l app=fluent-bit -f | grep "output"
 
 ### 6.1 Cross-Service Error Analysis
 
-```
+```sql
 fields @timestamp, kubernetes.pod_name, @message
 | filter @message like /(?i)(error|exception|fail|critical)/
 | stats count() as error_count by kubernetes.pod_name
@@ -402,7 +402,7 @@ fields @timestamp, kubernetes.pod_name, @message
 
 ### 6.2 Service-Specific Logs (Example: Basket API)
 
-```
+```sql
 fields @timestamp, @message, kubernetes.pod_name, kubernetes.container_name
 | filter kubernetes.pod_name like /basket/
 | stats count() by kubernetes.pod_name
@@ -410,7 +410,7 @@ fields @timestamp, @message, kubernetes.pod_name, kubernetes.container_name
 
 ### 6.3 HTTP Status Code Distribution
 
-```
+```sql
 fields @timestamp, http_status_code
 | stats count() as request_count by http_status_code
 | sort request_count desc
@@ -418,7 +418,7 @@ fields @timestamp, http_status_code
 
 ### 6.4 Slow Requests (> 1 second)
 
-```
+```sql
 fields @timestamp, kubernetes.pod_name, @duration_ms
 | filter @duration_ms > 1000
 | stats count(), avg(@duration_ms), max(@duration_ms), min(@duration_ms) by kubernetes.pod_name
@@ -528,7 +528,7 @@ terraform apply -target=module.cloudwatch_logging
 
 ### IAM Role Structure
 
-```
+```text
 Role: eshop-fluent-bit-dev
 ├── Trust Policy
 │   └── Allow IRSA: ServiceAccount fluent-bit in logging namespace
@@ -773,6 +773,7 @@ kubectl create token fluent-bit -n logging | jq -R 'split(".")[1] | @base64d' | 
 **Solutions**:
 
 1. Request quota increase via AWS Service Quotas:
+
    ```bash
    aws service-quotas list-services | grep -i logs
    aws service-quotas get-service-quota \

@@ -26,6 +26,7 @@ This module provides a complete monitoring stack:
 ### Alert Rules
 
 Predefined alert rules for:
+
 - **Kubernetes**: Pod Crash Loops, Node Status, Memory/Disk Pressure
 - **RabbitMQ**: Availability, Memory, unacked Messages, Connections
 - **Container Resources**: High CPU/Memory Usage
@@ -34,6 +35,7 @@ Predefined alert rules for:
 ### Grafana Dashboards
 
 The kube-prometheus-stack chart includes predefined dashboards:
+
 - Kubernetes Cluster Overview
 - Kubernetes Node Exporter
 - Prometheus Stats
@@ -72,39 +74,39 @@ module "monitoring" {
 
 ## Input Variables
 
-| Variable | Typ | Standard | Beschreibung |
-|----------|-----|---------|-------------|
-| `namespace` | string | `monitoring` | Kubernetes Namespace |
-| `enabled` | bool | `true` | Stack aktivieren/deaktivieren |
-| `chart_version` | string | `25.3.1` | kube-prometheus-stack Chart Version |
-| `prometheus_replica_count` | number | `1` | Prometheus Pod Replicas (1-5) |
-| `retention_days` | number | `15` | Metriken-Aufbewahrung in Tagen (1-365) |
-| `storage_size` | string | `10Gi` | Persistent Volume Größe |
-| `storage_class` | string | `gp2` | Kubernetes Storage Class |
-| `prometheus_resources` | object | - | CPU/Memory Requests und Limits |
-| `scrape_interval` | number | `30` | Scrape Interval in Sekunden (5-300) |
-| `evaluation_interval` | number | `30` | Alert Evaluation Interval in Sekunden |
-| `node_exporter_enabled` | bool | `true` | Node Exporter aktivieren |
-| `kube_state_metrics_enabled` | bool | `true` | kube-state-metrics aktivieren |
-| `alertmanager_enabled` | bool | `true` | Alertmanager aktivieren |
-| `grafana_enabled` | bool | `true` | Grafana aktivieren |
-| `grafana_admin_password` | string | - | Grafana Admin Password (auto-generated wenn leer) |
-| `external_labels` | map | - | Externe Labels für alle Metriken |
-| `tags` | map | - | Kubernetes Labels |
+| Variable                     | Typ    | Standard     | Beschreibung                                      |
+| ---------------------------- | ------ | ------------ | ------------------------------------------------- |
+| `namespace`                  | string | `monitoring` | Kubernetes Namespace                              |
+| `enabled`                    | bool   | `true`       | Stack aktivieren/deaktivieren                     |
+| `chart_version`              | string | `25.3.1`     | kube-prometheus-stack Chart Version               |
+| `prometheus_replica_count`   | number | `1`          | Prometheus Pod Replicas (1-5)                     |
+| `retention_days`             | number | `15`         | Metriken-Aufbewahrung in Tagen (1-365)            |
+| `storage_size`               | string | `10Gi`       | Persistent Volume Größe                           |
+| `storage_class`              | string | `gp2`        | Kubernetes Storage Class                          |
+| `prometheus_resources`       | object | -            | CPU/Memory Requests und Limits                    |
+| `scrape_interval`            | number | `30`         | Scrape Interval in Sekunden (5-300)               |
+| `evaluation_interval`        | number | `30`         | Alert Evaluation Interval in Sekunden             |
+| `node_exporter_enabled`      | bool   | `true`       | Node Exporter aktivieren                          |
+| `kube_state_metrics_enabled` | bool   | `true`       | kube-state-metrics aktivieren                     |
+| `alertmanager_enabled`       | bool   | `true`       | Alertmanager aktivieren                           |
+| `grafana_enabled`            | bool   | `true`       | Grafana aktivieren                                |
+| `grafana_admin_password`     | string | -            | Grafana Admin Password (auto-generated wenn leer) |
+| `external_labels`            | map    | -            | Externe Labels für alle Metriken                  |
+| `tags`                       | map    | -            | Kubernetes Labels                                 |
 
 ## Outputs
 
-| Output | Beschreibung |
-|--------|------------|
-| `namespace` | Kubernetes Namespace des Monitoring Stacks |
-| `prometheus_endpoint` | Prometheus Service FQDN |
-| `prometheus_url` | HTTP URL für Prometheus |
-| `grafana_endpoint` | Grafana Service FQDN |
-| `grafana_url` | HTTP URL für Grafana |
-| `grafana_admin_password` | Grafana Admin Password |
-| `alertmanager_endpoint` | Alertmanager Service FQDN |
-| `alertmanager_url` | HTTP URL für Alertmanager |
-| `deployment_info` | Zusammenfassung der Deployment-Konfiguration |
+| Output                   | Beschreibung                                 |
+| ------------------------ | -------------------------------------------- |
+| `namespace`              | Kubernetes Namespace des Monitoring Stacks   |
+| `prometheus_endpoint`    | Prometheus Service FQDN                      |
+| `prometheus_url`         | HTTP URL für Prometheus                      |
+| `grafana_endpoint`       | Grafana Service FQDN                         |
+| `grafana_url`            | HTTP URL für Grafana                         |
+| `grafana_admin_password` | Grafana Admin Password                       |
+| `alertmanager_endpoint`  | Alertmanager Service FQDN                    |
+| `alertmanager_url`       | HTTP URL für Alertmanager                    |
+| `deployment_info`        | Zusammenfassung der Deployment-Konfiguration |
 
 ## Zugriff auf die Services
 
@@ -142,9 +144,9 @@ Das Modul konfiguriert automatisch RabbitMQ Scraping:
 
 ```yaml
 # RabbitMQ Prometheus Plugin (Port 15692)
-- job_name: 'rabbitmq'
+- job_name: "rabbitmq"
   static_configs:
-    - targets: ['rabbitmq-headless.rabbitmq.svc.cluster.local:15692']
+    - targets: ["rabbitmq-headless.rabbitmq.svc.cluster.local:15692"]
 ```
 
 ### Custom Pod Annotations
@@ -154,13 +156,14 @@ Prometheus sucht nach Pods mit folgenden Annotations:
 ```yaml
 annotations:
   prometheus.io/scrape: "true"
-  prometheus.io/path: "/metrics"        # Optional (default: /metrics)
-  prometheus.io/port: "8080"            # Optional (default: 8080)
+  prometheus.io/path: "/metrics" # Optional (default: /metrics)
+  prometheus.io/port: "8080" # Optional (default: 8080)
 ```
 
 ## Alert Rules Anpassen
 
 Alert Rules sind als Kubernetes CRD `PrometheusRule` definiert in:
+
 - `main.tf`: `kubernetes_manifest.prometheus_rules` Resource
 
 Zum Hinzufügen neuer Alert Rules:
@@ -191,6 +194,7 @@ Grafana wird mit Prometheus als DataSource vorkonfiguriert.
 ```
 
 Beliebte vordefinierte Dashboards von Grafana Labs:
+
 - [Prometheus 2.0 Overview](https://grafana.com/grafana/dashboards/3662)
 - [Kubernetes Cluster Monitoring](https://grafana.com/grafana/dashboards/7249)
 - [RabbitMQ Overview](https://grafana.com/grafana/dashboards/10991)

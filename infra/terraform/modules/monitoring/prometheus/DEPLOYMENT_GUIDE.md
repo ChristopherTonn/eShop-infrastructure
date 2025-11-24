@@ -6,7 +6,7 @@ This document describes the deployment, configuration, and operational procedure
 
 ## Architecture Components
 
-```
+```mermaid
 ┌──────────────────────────────────────────────────────────────────┐
 │                     Kubernetes Cluster                           │
 ├──────────────────────────────────────────────────────────────────┤

@@ -69,7 +69,8 @@ aws logs describe-log-groups \
 ```
 
 **Expected Output:**
-```
+
+```text
 |                              logGroupName                              |
 |------------------------------------------------------------------------|
 | /aws/eks/eshop-dev-cluster/basket-api                                 |
@@ -152,7 +153,7 @@ Run these in CloudWatch Insights Console (Logs → Insights → Select log group
 
 ### Find All Errors Last Hour
 
-```
+```sql
 fields @timestamp, kubernetes.pod_name, @message
 | filter @message like /(?i)error|exception|fail/
 | stats count() as errors by kubernetes.pod_name
@@ -160,14 +161,14 @@ fields @timestamp, kubernetes.pod_name, @message
 
 ### Compare Services by Log Volume
 
-```
+```sql
 fields @timestamp, kubernetes.pod_name
 | stats count() as log_count by kubernetes.pod_name
 ```
 
 ### Find Slow Operations (> 100ms)
 
-```
+```sql
 fields @timestamp, response_time_ms, @message
 | filter response_time_ms > 100
 | stats avg(response_time_ms), max(response_time_ms) by kubernetes.pod_name
@@ -175,7 +176,7 @@ fields @timestamp, response_time_ms, @message
 
 ### Monitor Pod Restarts
 
-```
+```sql
 fields @timestamp, kubernetes.pod_name
 | filter @message like /restart|Terminating/
 | stats count() as restart_count by kubernetes.pod_name
@@ -318,4 +319,4 @@ terraform apply
 
 **Time to full logging:** ~5 minutes ⏱️  
 **Logs visible in CloudWatch:** ~1-2 minutes after deployment  
-**Ready for monitoring:** Immediately after Fluent Bit pods start  
+**Ready for monitoring:** Immediately after Fluent Bit pods start

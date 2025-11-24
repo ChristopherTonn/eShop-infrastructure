@@ -301,6 +301,14 @@ module "monitoring" {
   grafana_enabled             = var.grafana_enabled
   grafana_admin_password      = var.grafana_admin_password
 
+  # Email Notification Configuration
+  alertmanager_smtp_host     = var.alertmanager_smtp_host
+  alertmanager_smtp_port     = var.alertmanager_smtp_port
+  alertmanager_smtp_user     = var.alertmanager_smtp_user
+  alertmanager_smtp_password = var.alertmanager_smtp_password
+  alertmanager_email_from    = var.alertmanager_email_from
+  alertmanager_email_to      = var.alertmanager_email_to
+
   external_labels = {
     cluster     = "eshop-dev"
     environment = "development"

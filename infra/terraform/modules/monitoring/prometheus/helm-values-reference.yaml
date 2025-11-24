@@ -13,14 +13,14 @@ prometheusOperator:
 # Prometheus Configuration
 prometheus:
   enabled: true
-  
+
   prometheusSpec:
     # Replicas
     replicas: 1
-    
+
     # Retention
     retention: 15d
-    
+
     # Storage
     storageSpec:
       volumeClaimTemplate:
@@ -30,7 +30,7 @@ prometheus:
           resources:
             requests:
               storage: 10Gi
-    
+
     # Resources
     resources:
       requests:
@@ -39,21 +39,21 @@ prometheus:
       limits:
         cpu: 1000m
         memory: 2Gi
-    
+
     # Scrape Configuration
     scrapeInterval: 30s
     evaluationInterval: 30s
-    
+
     # Service Discovery
     serviceMonitorSelectorNilUsesHelmValues: false
     podMonitorSelectorNilUsesHelmValues: false
     ruleSelectorNilUsesHelmValues: false
-    
+
     # External Labels
     externalLabels:
       cluster: eshop-dev
       environment: development
-    
+
     # Security Context
     securityContext:
       runAsNonRoot: true
@@ -63,15 +63,15 @@ prometheus:
 # Grafana
 grafana:
   enabled: true
-  
+
   # Admin Credentials
-  adminPassword: admin  # Will be overridden by Terraform
-  
+  adminPassword: admin # Will be overridden by Terraform
+
   # Service
   service:
     type: ClusterIP
     port: 80
-  
+
   # DataSources - Prometheus wird automatisch hinzugefügt
   datasources:
     datasources.yaml:
@@ -81,15 +81,15 @@ grafana:
           type: prometheus
           url: http://kube-prometheus-stack.monitoring.svc.cluster.local:9090
           isDefault: true
-  
+
   # Dashboards - Provisioning
   dashboardProviders:
     dashboardproviders.yaml:
       apiVersion: 1
       providers:
-        - name: 'default'
+        - name: "default"
           orgId: 1
-          folder: ''
+          folder: ""
           type: file
           disableDeletion: false
           updateIntervalSeconds: 10
@@ -100,10 +100,10 @@ grafana:
 # Alertmanager
 alertmanager:
   enabled: true
-  
+
   alertmanagerSpec:
     replicas: 1
-    
+
     # Storage
     storage:
       volumeClaimTemplate:
@@ -113,7 +113,7 @@ alertmanager:
           resources:
             requests:
               storage: 1Gi
-    
+
     # Resources
     resources:
       requests:
@@ -122,28 +122,28 @@ alertmanager:
       limits:
         cpu: 500m
         memory: 512Mi
-  
+
   # Configuration
   config:
     global:
       resolve_timeout: 5m
-    
+
     route:
-      group_by: ['alertname', 'cluster', 'service']
+      group_by: ["alertname", "cluster", "service"]
       group_wait: 30s
       group_interval: 5m
       repeat_interval: 12h
-      receiver: 'default'
+      receiver: "default"
       routes:
         - match:
             severity: critical
           receiver: critical
           group_wait: 10s
           repeat_interval: 1h
-    
+
     receivers:
-      - name: 'default'
-      - name: 'critical'
+      - name: "default"
+      - name: "critical"
 
 # Node Exporter
 nodeExporter:
@@ -172,7 +172,7 @@ kubelet:
 serviceMonitors:
   enabled: true
   # Custom service monitors können hier definiert werden
-  
+
 # Pod Monitors
 podMonitors:
   enabled: true

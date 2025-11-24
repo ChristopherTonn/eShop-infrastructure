@@ -12,7 +12,7 @@ This module provides a complete centralized logging stack consisting of:
 
 ## Architecture
 
-```
+```mermaid
 ┌────────────────────────────────────────────────────────────────┐
 │                     Kubernetes Cluster                         │
 ├────────────────────────────────────────────────────────────────┤
@@ -259,7 +259,7 @@ Main configuration in `logging/fluent-bit/values.yaml`:
 
 ### Find All Errors (Last 1 Hour)
 
-```
+```sql
 fields @timestamp, kubernetes.pod_name, @message
 | filter @message like /(?i)(error|exception|fail)/
 | stats count() by kubernetes.pod_name
@@ -267,7 +267,7 @@ fields @timestamp, kubernetes.pod_name, @message
 
 ### Basket API - Response Time Analysis
 
-```
+```sql
 fields @timestamp, kubernetes.pod_name, http_status_code, response_time_ms
 | filter kubernetes.pod_name like /basket/
 | stats avg(response_time_ms), max(response_time_ms), pct(response_time_ms, 95) by http_status_code
@@ -275,7 +275,7 @@ fields @timestamp, kubernetes.pod_name, http_status_code, response_time_ms
 
 ### RabbitMQ Message Processing
 
-```
+```sql
 fields @timestamp, @message, queue_name
 | filter kubernetes.pod_name like /rabbitmq/
 | stats count() as message_count by queue_name
@@ -283,7 +283,7 @@ fields @timestamp, @message, queue_name
 
 ### Pod Restart Tracking
 
-```
+```sql
 fields @timestamp, kubernetes.pod_name, kubernetes.namespace_name
 | filter @message like /restart|Terminating|CrashLoopBackOff/
 | stats count() as restart_count by kubernetes.pod_name
@@ -291,7 +291,7 @@ fields @timestamp, kubernetes.pod_name, kubernetes.namespace_name
 
 ### Database Slow Query Detection
 
-```
+```sql
 fields @timestamp, @duration_ms, @query
 | filter @duration_ms > 1000
 | stats count(), avg(@duration_ms) by @query
@@ -366,16 +366,19 @@ curl http://localhost:2020/api/v1/metrics/prometheus
 ### Logs Not Appearing in CloudWatch
 
 1. Check Fluent Bit pod status:
+
    ```bash
    kubectl describe pod -n logging -l app=fluent-bit
    ```
 
 2. Check Fluent Bit logs:
+
    ```bash
    kubectl logs -n logging -l app=fluent-bit --tail=100
    ```
 
 3. Verify IAM permissions:
+
    ```bash
    kubectl get serviceaccount fluent-bit -n logging -o yaml
    # Check if role ARN annotation is present
@@ -389,6 +392,7 @@ curl http://localhost:2020/api/v1/metrics/prometheus
 ### High Memory Usage in Fluent Bit
 
 1. Increase buffer size limit:
+
    ```hcl
    fluent_bit_buffer_size = "64m"  # Default: 32m
    terraform apply
@@ -403,11 +407,13 @@ curl http://localhost:2020/api/v1/metrics/prometheus
 ### IAM Role Issues
 
 1. Verify OIDC Provider is configured:
+
    ```bash
    aws iam list-open-id-connect-providers
    ```
 
 2. Check ServiceAccount annotation:
+
    ```bash
    kubectl get sa fluent-bit -n logging -o jsonpath='{.metadata.annotations.eks\.amazonaws\.com/role-arn}'
    ```
@@ -423,6 +429,7 @@ curl http://localhost:2020/api/v1/metrics/prometheus
 ### Log Parsing Errors
 
 1. Check Fluent Bit parser configuration:
+
    ```bash
    kubectl exec -it -n logging -l app=fluent-bit -- \
      cat /fluent-bit/etc/fluent-bit.conf | grep -A5 PARSER

@@ -7,10 +7,10 @@
 global:
   resolve_timeout: 5m
   # SMTP Configuration for Email Notifications
-  smtp_smarthost: '${smtp_host}:${smtp_port}'
-  smtp_auth_username: '${smtp_user}'
-  smtp_auth_password: '${smtp_password}'
-  smtp_from: '${email_from}'
+  smtp_smarthost: "${smtp_host}:${smtp_port}"
+  smtp_auth_username: "${smtp_user}"
+  smtp_auth_password: "${smtp_password}"
+  smtp_from: "${email_from}"
   smtp_require_tls: true
 
 # Inhibition rules prevent sending notifications for certain alerts
@@ -18,32 +18,32 @@ global:
 inhibit_rules:
   # Don't send warning alerts if critical alert is already firing
   - source_match:
-      severity: 'critical'
+      severity: "critical"
     target_match:
-      severity: 'warning'
-    equal: ['alertname', 'component']
+      severity: "warning"
+    equal: ["alertname", "component"]
 
   # Don't send info alerts if warning alert is already firing
   - source_match:
-      severity: 'warning'
+      severity: "warning"
     target_match:
-      severity: 'info'
-    equal: ['alertname', 'component']
+      severity: "info"
+    equal: ["alertname", "component"]
 
 # Routing configuration: determines who receives which alerts
 route:
   # Default receiver for alerts
-  receiver: 'developers-email'
-  
+  receiver: "developers-email"
+
   # Group alerts by these labels to avoid duplicate notifications
-  group_by: ['alertname', 'component', 'severity']
-  
+  group_by: ["alertname", "component", "severity"]
+
   # Wait before sending first notification (allows grouping multiple alerts)
   group_wait: 10s
-  
+
   # Send additional notifications every interval for ongoing incidents
   group_interval: 10m
-  
+
   # How often to send notifications for the same alert
   repeat_interval: 4h
 
@@ -52,16 +52,16 @@ route:
     # Critical alerts: immediate notification without batching
     - match:
         severity: critical
-      receiver: 'critical-email'
-      group_wait: 0s          # Send immediately
-      group_interval: 5m      # Regroup every 5 minutes
-      repeat_interval: 1h     # Remind every hour
-      continue: true          # Also send to parent receiver
+      receiver: "critical-email"
+      group_wait: 0s # Send immediately
+      group_interval: 5m # Regroup every 5 minutes
+      repeat_interval: 1h # Remind every hour
+      continue: true # Also send to parent receiver
 
     # Warning alerts: batch and send every 10 minutes
     - match:
         severity: warning
-      receiver: 'developers-email'
+      receiver: "developers-email"
       group_wait: 10s
       group_interval: 10m
       repeat_interval: 4h
@@ -70,7 +70,7 @@ route:
     # Info alerts: send every 24 hours (can be ignored if unwanted)
     - match:
         severity: info
-      receiver: 'developers-email'
+      receiver: "developers-email"
       group_wait: 30s
       group_interval: 24h
       repeat_interval: 24h
@@ -79,12 +79,12 @@ route:
 # Receivers define how notifications are sent (email, webhook, etc.)
 receivers:
   # Default receiver for all alerts
-  - name: 'developers-email'
+  - name: "developers-email"
     email_configs:
-      - to: '${email_to}'
+      - to: "${email_to}"
         headers:
-          Subject: '[{{ .GroupLabels.severity | upper }}] {{ .GroupLabels.alertname }} - {{ .Status }}'
-          X-Alert-Component: '{{ .GroupLabels.component }}'
+          Subject: "[{{ .GroupLabels.severity | upper }}] {{ .GroupLabels.alertname }} - {{ .Status }}"
+          X-Alert-Component: "{{ .GroupLabels.component }}"
         html: |
           <!DOCTYPE html>
           <html>
@@ -161,24 +161,24 @@ receivers:
           Status: {{ .Status | upper }}
           Severity: {{ .GroupLabels.severity | upper }}
           Component: {{ .GroupLabels.component }}
-          
+
           {{ range .Alerts.Firing }}
           Instance: {{ .Labels.instance | default "N/A" }}
           Summary: {{ .Annotations.summary }}
           Description: {{ .Annotations.description }}
-          
+
           {{ end }}
-          
+
           Time: {{ now | date "2006-01-02 15:04:05 MST" }}
 
   # Dedicated receiver for critical alerts (immediate, separate inbox)
-  - name: 'critical-email'
+  - name: "critical-email"
     email_configs:
-      - to: '${email_to}'
+      - to: "${email_to}"
         headers:
-          Subject: '🚨 CRITICAL: {{ .GroupLabels.alertname }} - IMMEDIATE ACTION REQUIRED'
-          X-Alert-Component: '{{ .GroupLabels.component }}'
-          X-Alert-Severity: 'CRITICAL'
+          Subject: "🚨 CRITICAL: {{ .GroupLabels.alertname }} - IMMEDIATE ACTION REQUIRED"
+          X-Alert-Component: "{{ .GroupLabels.component }}"
+          X-Alert-Severity: "CRITICAL"
         html: |
           <!DOCTYPE html>
           <html>
@@ -245,17 +245,17 @@ receivers:
           </html>
         text: |
           🚨 CRITICAL ALERT 🚨
-          
+
           Alert: {{ .GroupLabels.alertname }}
           Severity: CRITICAL
           Component: {{ .GroupLabels.component }}
-          
+
           IMMEDIATE ACTION REQUIRED
-          
+
           {{ range .Alerts.Firing }}
           Summary: {{ .Annotations.summary }}
           Description: {{ .Annotations.description }}
           Instance: {{ .Labels.instance | default "N/A" }}
           {{ end }}
-          
+
           Time: {{ now | date "2006-01-02 15:04:05 MST" }}

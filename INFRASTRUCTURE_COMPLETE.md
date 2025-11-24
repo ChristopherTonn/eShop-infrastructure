@@ -79,7 +79,7 @@ This document summarizes the completed implementation of the eShop infrastructur
 
 **Status:** `terraform validate` - SUCCESS
 
-```
+```bash
 ✅ Configuration is valid
 ✅ All module dependencies resolved
 ✅ Provider versions locked (.terraform.lock.hcl)
@@ -89,7 +89,7 @@ This document summarizes the completed implementation of the eShop infrastructur
 
 **Terraform Initialization:**
 
-```
+```bash
 ✅ Terraform v1.5.7 compatible
 ✅ 5 provider plugins installed:
    - AWS v5.100.0
@@ -180,7 +180,7 @@ This document summarizes the completed implementation of the eShop infrastructur
 
 ### Components Deployed
 
-```
+```mermaid
 ┌─────────────────────────────────────────┐
 │         AWS Account (eu-central-1)      │
 ├─────────────────────────────────────────┤
@@ -223,7 +223,7 @@ This document summarizes the completed implementation of the eShop infrastructur
 
 ## File Structure
 
-```
+```text
 infra/
 ├── terraform/
 │   ├── envs/
