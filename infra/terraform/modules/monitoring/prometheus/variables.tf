@@ -177,3 +177,46 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+# ============================================================================
+# Alertmanager Email Configuration Variables
+# ============================================================================
+
+variable "alertmanager_smtp_host" {
+  description = "SMTP server hostname (e.g., smtp.gmail.com)"
+  type        = string
+  default     = "smtp.gmail.com"
+}
+
+variable "alertmanager_smtp_port" {
+  description = "SMTP server port"
+  type        = number
+  default     = 587
+}
+
+variable "alertmanager_smtp_user" {
+  description = "SMTP username for authentication"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "alertmanager_smtp_password" {
+  description = "SMTP password for authentication"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "alertmanager_email_from" {
+  description = "Email address alerts are sent from"
+  type        = string
+  default     = "alerts@eshop.de"
+}
+
+variable "alertmanager_email_to" {
+  description = "List of email addresses to send alerts to"
+  type        = list(string)
+  default     = ["devops@eshop.de", "christopher.tonn@gmail.com"]
+}
+

@@ -382,6 +382,74 @@ resource "kubernetes_manifest" "prometheus_rules" {
 }
 
 # ============================================================================
+# Grafana Dashboards - ConfigMaps
+# ============================================================================
+
+# Create ConfigMaps for each Grafana dashboard
+resource "kubernetes_config_map" "grafana_dashboards" {
+  for_each = var.enabled ? fileset("${path.module}/dashboards", "*.json") : toset([])
+
+  metadata {
+    name      = "grafana-dashboard-${replace(each.key, ".json", "")}"
+    namespace = kubernetes_namespace.monitoring[0].metadata[0].name
+
+    labels = merge(
+      var.tags,
+      {
+        "app.kubernetes.io/name"       = "grafana"
+        "app.kubernetes.io/component"  = "dashboard"
+        "grafana_dashboard"            = "1"  # Tell Grafana to load this ConfigMap
+        "app.kubernetes.io/managed-by" = "terraform"
+      }
+    )
+  }
+
+  data = {
+    "${each.key}" = file("${path.module}/dashboards/${each.key}")
+  }
+
+  depends_on = [helm_release.kube_prometheus_stack]
+}
+
+# ============================================================================
+# Alertmanager Email Configuration - ConfigMap
+# ============================================================================
+
+resource "kubernetes_config_map" "alertmanager_email_config" {
+  count = var.enabled && var.alertmanager_enabled ? 1 : 0
+
+  metadata {
+    name      = "alertmanager-email-config"
+    namespace = kubernetes_namespace.monitoring[0].metadata[0].name
+
+    labels = merge(
+      var.tags,
+      {
+        "app.kubernetes.io/name"       = "alertmanager"
+        "app.kubernetes.io/component"  = "config"
+        "app.kubernetes.io/managed-by" = "terraform"
+      }
+    )
+  }
+
+  data = {
+    "alertmanager-email-config.yaml" = templatefile(
+      "${path.module}/alertmanager-email-config.yaml",
+      {
+        smtp_host     = var.alertmanager_smtp_host
+        smtp_port     = var.alertmanager_smtp_port
+        smtp_user     = var.alertmanager_smtp_user
+        smtp_password = var.alertmanager_smtp_password
+        email_from    = var.alertmanager_email_from
+        email_to      = var.alertmanager_email_to[0]  # Use first email as primary
+      }
+    )
+  }
+
+  depends_on = [helm_release.kube_prometheus_stack]
+}
+
+# ============================================================================
 # Local Computed Values
 # ============================================================================
 

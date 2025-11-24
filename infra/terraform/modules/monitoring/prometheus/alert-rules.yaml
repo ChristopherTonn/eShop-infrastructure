@@ -115,6 +115,108 @@ spec:
             summary: "RabbitMQ connections high (instance {{ $labels.instance }})"
             description: "RabbitMQ instance {{ $labels.instance }} has {{ $value }} connections"
 
+        - alert: RabbitMQQueueDepthHigh
+          expr: 'rabbitmq_queue_messages_ready > 10000'
+          for: 5m
+          labels:
+            severity: warning
+            component: rabbitmq
+          annotations:
+            summary: "RabbitMQ queue depth is high (queue {{ $labels.queue }})"
+            description: "Queue {{ $labels.queue }} has {{ $value }} messages ready for delivery"
+
+    # ====================================================================
+    # Database Alerts (PostgreSQL)
+    # ====================================================================
+    - name: database.rules
+      interval: 30s
+      rules:
+        - alert: PostgreSQLDown
+          expr: 'pg_up == 0'
+          for: 5m
+          labels:
+            severity: critical
+            component: database
+          annotations:
+            summary: "PostgreSQL is down (instance {{ $labels.instance }})"
+            description: "PostgreSQL instance {{ $labels.instance }} is not responding"
+
+        - alert: PostgreSQLSlowQueries
+          expr: 'rate(pg_slow_queries_total[5m]) > 0.5'
+          for: 5m
+          labels:
+            severity: warning
+            component: database
+          annotations:
+            summary: "PostgreSQL slow queries detected (instance {{ $labels.instance }})"
+            description: "PostgreSQL instance {{ $labels.instance }} has slow queries: {{ $value }} per second"
+
+        - alert: PostgreSQLConnectionsHigh
+          expr: 'sum by (instance) (pg_stat_activity_count) > 80'
+          for: 5m
+          labels:
+            severity: warning
+            component: database
+          annotations:
+            summary: "PostgreSQL connections high (instance {{ $labels.instance }})"
+            description: "PostgreSQL instance {{ $labels.instance }} has {{ $value }} active connections"
+
+        - alert: PostgreSQLCacheMissRatio
+          expr: 'rate(pg_stat_database_blks_miss[5m]) / (rate(pg_stat_database_blks_read[5m]) + rate(pg_stat_database_blks_hit[5m])) > 0.05'
+          for: 5m
+          labels:
+            severity: warning
+            component: database
+          annotations:
+            summary: "PostgreSQL cache miss ratio is high (instance {{ $labels.instance }})"
+            description: "PostgreSQL instance {{ $labels.instance }} has cache miss ratio: {{ $value }}"
+
+    # ====================================================================
+    # Application Service Alerts
+    # ====================================================================
+    - name: application.rules
+      interval: 30s
+      rules:
+        - alert: ServiceDown
+          expr: 'up{job=~"basket-api|catalog-api|ordering-api|identity-api|webhooks-api"} == 0'
+          for: 5m
+          labels:
+            severity: critical
+            component: application
+          annotations:
+            summary: "Service is down (service {{ $labels.job }})"
+            description: "Service {{ $labels.job }} on instance {{ $labels.instance }} is down"
+
+        - alert: HighErrorRate
+          expr: 'rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05'
+          for: 5m
+          labels:
+            severity: warning
+            component: application
+          annotations:
+            summary: "High error rate (service {{ $labels.job }})"
+            description: "Service {{ $labels.job }} has error rate of {{ $value | humanizePercentage }}"
+
+        - alert: HighLatency
+          expr: 'histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1'
+          for: 10m
+          labels:
+            severity: warning
+            component: application
+          annotations:
+            summary: "High request latency (service {{ $labels.job }})"
+            description: "Service {{ $labels.job }} P95 latency is {{ $value }}s"
+
+        - alert: HighRequestRate
+          expr: 'rate(http_requests_total[5m]) > 1000'
+          for: 5m
+          labels:
+            severity: info
+            component: application
+          annotations:
+            summary: "High request rate (service {{ $labels.job }})"
+            description: "Service {{ $labels.job }} has request rate of {{ $value }} req/s"
+
     # ====================================================================
     # Container Resource Alerts
     # ====================================================================
