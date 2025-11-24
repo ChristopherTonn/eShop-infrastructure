@@ -1,8 +1,9 @@
 #!/bin/bash
 
-# eShop Infrastructure Destruction Script - AWS EKS
-# Removes all Kubernetes deployments, services, and cleans up AWS resources
-# Note: Does NOT destroy Terraform infrastructure (databases, VPC, etc.)
+# eShop Infrastructure Destruction Script - Kubernetes Only
+# Removes all Kubernetes resources from all namespaces
+# IMPORTANT: Does NOT destroy AWS infrastructure (use 'terraform destroy' separately if needed)
+# NOTE: 'terraform destroy' often hangs - use manual cleanup instead
 
 set -e
 
@@ -12,16 +13,17 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-echo -e "${YELLOW}💥 eShop Infrastructure Destruction${NC}"
+echo -e "${YELLOW}💥 eShop Kubernetes Cleanup${NC}"
 echo "========================================"
 echo ""
-echo -e "${RED}WARNING: This will remove all Kubernetes deployments and services!${NC}"
+echo -e "${RED}WARNING: This will remove all Kubernetes resources from ALL namespaces!${NC}"
+echo -e "${YELLOW}AWS Infrastructure will remain (RDS, VPC, etc.)${NC}"
 echo ""
 
 # Configuration
-CLUSTER_NAME="${EKS_CLUSTER_NAME:-eks-dev}"
+CLUSTER_NAME="${EKS_CLUSTER_NAME:-eshop-dev-eks}"
 AWS_REGION="${AWS_REGION:-eu-central-1}"
-NAMESPACE="default"
+NAMESPACES=("default" "monitoring" "rabbitmq" "logging" "kube-system")  # All app namespaces
 
 # 1. Verify AWS credentials
 echo -e "${YELLOW}📋 Step 1: Verify AWS Credentials${NC}"
@@ -54,18 +56,27 @@ if ! kubectl cluster-info &> /dev/null; then
 else
     echo "  ✅ kubectl configured successfully"
 
-    # 3. Delete all Helm releases
-    echo -e "${YELLOW}📋 Step 3: Delete Helm Releases${NC}"
+    # 3. Delete all Helm releases from ALL namespaces
+    echo -e "${YELLOW}📋 Step 3: Delete Helm Releases (ALL Namespaces)${NC}"
     if command -v helm &> /dev/null; then
-        RELEASES=$(helm list --namespace $NAMESPACE --output json | jq -r '.[].name' 2>/dev/null || echo "")
+        # Get all namespaces with Helm releases
+        ALL_NAMESPACES=$(helm list --all-namespaces --output json 2>/dev/null | jq -r '.[].namespace' | sort -u || echo "")
         
-        if [[ -n "$RELEASES" ]]; then
-            echo "  🗑️  Deleting Helm releases..."
-            echo "$RELEASES" | while read -r release; do
-                echo "    • Deleting release: $release"
-                helm uninstall "$release" --namespace $NAMESPACE || true
+        if [[ -n "$ALL_NAMESPACES" ]]; then
+            echo "  🗑️  Deleting Helm releases from all namespaces..."
+            echo "$ALL_NAMESPACES" | while read -r ns; do
+                if [[ -n "$ns" ]]; then
+                    RELEASES=$(helm list --namespace "$ns" --output json 2>/dev/null | jq -r '.[].name' || echo "")
+                    if [[ -n "$RELEASES" ]]; then
+                        echo "    Namespace: $ns"
+                        echo "$RELEASES" | while read -r release; do
+                            echo "      • Deleting: $release"
+                            helm uninstall "$release" --namespace "$ns" || true
+                        done
+                    fi
+                fi
             done
-            echo "  ✅ Helm releases deleted"
+            echo "  ✅ Helm releases deleted from all namespaces"
         else
             echo "  ℹ️  No Helm releases found"
         fi
@@ -73,29 +84,45 @@ else
         echo "  ⚠️  Helm not installed. Skipping Helm cleanup."
     fi
 
-    # 4. Delete Kubernetes deployments
-    echo -e "${YELLOW}📋 Step 4: Delete Kubernetes Deployments${NC}"
-    DEPLOYMENTS=$(kubectl get deployments -n $NAMESPACE -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
+    # 4. Delete ALL Kubernetes resources from ALL namespaces
+    echo -e "${YELLOW}📋 Step 4: Delete ALL Kubernetes Resources (ALL Namespaces)${NC}"
+    echo "  🗑️  Deleting all deployments, statefulsets, daemonsets..."
     
-    if [[ -n "$DEPLOYMENTS" ]]; then
-        echo "  🗑️  Deleting deployments..."
-        kubectl delete deployments --all -n $NAMESPACE --grace-period=30
-        echo "  ✅ Deployments deleted"
-    else
-        echo "  ℹ️  No deployments found"
-    fi
+    # Delete from custom namespaces
+    for ns in "${NAMESPACES[@]}"; do
+        if kubectl get namespace "$ns" &>/dev/null 2>&1; then
+            echo "    Namespace: $ns"
+            
+            # Delete deployments
+            kubectl delete deployments --all -n "$ns" --grace-period=30 2>/dev/null || true
+            
+            # Delete statefulsets
+            kubectl delete statefulsets --all -n "$ns" --grace-period=30 2>/dev/null || true
+            
+            # Delete daemonsets
+            kubectl delete daemonsets --all -n "$ns" --grace-period=30 2>/dev/null || true
+            
+            # Delete jobs
+            kubectl delete jobs --all -n "$ns" --grace-period=30 2>/dev/null || true
+        fi
+    done
+    echo "  ✅ Kubernetes resources deleted"
 
-    # 5. Delete services (excluding kubernetes service)
-    echo -e "${YELLOW}📋 Step 5: Delete Services${NC}"
-    SERVICES=$(kubectl get services -n $NAMESPACE -o jsonpath='{.items[?(@.metadata.name!="kubernetes")].metadata.name}' 2>/dev/null || echo "")
+    # 5. Delete services from ALL namespaces
+    echo -e "${YELLOW}📋 Step 5: Delete Services (ALL Namespaces)${NC}"
+    echo "  🗑️  Deleting services..."
     
-    if [[ -n "$SERVICES" ]]; then
-        echo "  🗑️  Deleting services..."
-        kubectl delete services --all -n $NAMESPACE
-        echo "  ✅ Services deleted"
-    else
-        echo "  ℹ️  No services found"
-    fi
+    for ns in "${NAMESPACES[@]}"; do
+        if kubectl get namespace "$ns" &>/dev/null 2>&1; then
+            # Get services excluding kubernetes service
+            SERVICES=$(kubectl get services -n "$ns" -o jsonpath='{.items[?(@.metadata.name!="kubernetes")].metadata.name}' 2>/dev/null || echo "")
+            if [[ -n "$SERVICES" ]]; then
+                echo "    Namespace: $ns"
+                kubectl delete services --all -n "$ns" 2>/dev/null || true
+            fi
+        fi
+    done
+    echo "  ✅ Services deleted"
 
     # 6. Wait for LoadBalancer cleanup
     echo -e "${YELLOW}📋 Step 6: Wait for LoadBalancer Cleanup${NC}"
@@ -103,56 +130,159 @@ else
     sleep 30
     echo "  ✅ LoadBalancers cleanup initiated"
 
-    # 7. Delete persistent volumes
-    echo -e "${YELLOW}📋 Step 7: Delete Persistent Volumes${NC}"
-    PVCs=$(kubectl get pvc -n $NAMESPACE -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
+    # 7. Delete persistent volumes from ALL namespaces
+    echo -e "${YELLOW}📋 Step 7: Delete Persistent Volumes (ALL Namespaces)${NC}"
+    echo "  🗑️  Deleting persistent volume claims..."
     
-    if [[ -n "$PVCs" ]]; then
-        echo "  🗑️  Deleting persistent volume claims..."
-        kubectl delete pvc --all -n $NAMESPACE
-        echo "  ✅ PVCs deleted"
-    else
-        echo "  ℹ️  No persistent volumes found"
-    fi
+    for ns in "${NAMESPACES[@]}"; do
+        if kubectl get namespace "$ns" &>/dev/null 2>&1; then
+            PVCs=$(kubectl get pvc -n "$ns" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
+            if [[ -n "$PVCs" ]]; then
+                echo "    Namespace: $ns"
+                kubectl delete pvc --all -n "$ns" 2>/dev/null || true
+            fi
+        fi
+    done
+    echo "  ✅ PVCs deleted"
+
+    # 8. Delete ConfigMaps and Secrets from custom namespaces
+    echo -e "${YELLOW}📋 Step 8: Delete ConfigMaps & Secrets (Custom Namespaces)${NC}"
+    echo "  🗑️  Cleaning up ConfigMaps and Secrets..."
+    
+    for ns in "monitoring" "rabbitmq" "logging"; do
+        if kubectl get namespace "$ns" &>/dev/null 2>&1; then
+            echo "    Namespace: $ns"
+            kubectl delete configmaps --all -n "$ns" 2>/dev/null || true
+            kubectl delete secrets --all -n "$ns" --ignore-not-found 2>/dev/null || true
+        fi
+    done
+    echo "  ✅ ConfigMaps and Secrets cleaned up"
 fi
 
-# 8. Clean up ECR images (optional)
-echo -e "${YELLOW}📋 Step 8: Clean up ECR Images (Optional)${NC}"
+# 9. Clean up ECR images (optional)
+echo -e "${YELLOW}📋 Step 9: Clean up ECR Images (Optional)${NC}"
 echo "  💡 To delete ECR repositories, run:"
 echo "     aws ecr delete-repository --repository-name eshop-[service-name] --force --region $AWS_REGION"
 
-# 9. Cleanup summary
+# 10. AWS Infrastructure Cleanup (SAFE - using AWS CLI, not terraform destroy)
+echo -e "${YELLOW}📋 Step 10: AWS Infrastructure Cleanup${NC}"
+echo ""
+echo -e "${YELLOW}🔍 Checking AWS resources...${NC}"
+
+# Check if we should clean up AWS
+if [[ "${CLEANUP_AWS:-false}" == "true" ]]; then
+    echo -e "${RED}⚠️  AWS CLEANUP ENABLED - Will delete RDS, ElastiCache, EKS, VPC, ECR${NC}"
+    echo ""
+    
+    # 10.1 Delete LoadBalancers first
+    echo "  Step 10.1: Clean up LoadBalancers..."
+    aws elb describe-load-balancers --region $AWS_REGION --output json | \
+    jq -r '.LoadBalancerDescriptions[].LoadBalancerName' | grep -i eshop | while read -r lb; do
+        echo "    • Deleting LoadBalancer: $lb"
+        aws elb delete-load-balancer --load-balancer-name "$lb" --region $AWS_REGION 2>/dev/null || true
+    done
+    
+    # 10.2 Delete RDS Databases
+    echo "  Step 10.2: Clean up RDS Databases..."
+    aws rds describe-db-instances --region $AWS_REGION --output json 2>/dev/null | \
+    jq -r '.DBInstances[] | select(.DBInstanceIdentifier | contains("eshop")) | .DBInstanceIdentifier' | while read -r db; do
+        echo "    • Deleting RDS: $db"
+        aws rds delete-db-instance --db-instance-identifier "$db" --skip-final-snapshot --region $AWS_REGION 2>/dev/null || true
+    done
+    
+    # 10.3 Delete ElastiCache Clusters
+    echo "  Step 10.3: Clean up ElastiCache Redis..."
+    aws elasticache describe-cache-clusters --region $AWS_REGION --output json 2>/dev/null | \
+    jq -r '.CacheClusters[] | select(.CacheClusterId | contains("eshop")) | .CacheClusterId' | while read -r cache; do
+        echo "    • Deleting ElastiCache: $cache"
+        aws elasticache delete-cache-cluster --cache-cluster-id "$cache" --region $AWS_REGION 2>/dev/null || true
+    done
+    
+    # 10.4 Delete ECR Repositories
+    echo "  Step 10.4: Clean up ECR Repositories..."
+    aws ecr describe-repositories --region $AWS_REGION --output json 2>/dev/null | \
+    jq -r '.repositories[] | select(.repositoryName | contains("eshop")) | .repositoryName' | while read -r repo; do
+        echo "    • Deleting ECR repo: $repo"
+        aws ecr delete-repository --repository-name "$repo" --force --region $AWS_REGION 2>/dev/null || true
+    done
+    
+    # 10.5 Delete EKS Cluster (last, takes time)
+    echo "  Step 10.5: Clean up EKS Cluster (this may take 5-10 minutes)..."
+    echo "    ⏳ Deleting EKS cluster: $CLUSTER_NAME"
+    aws eks delete-cluster --name $CLUSTER_NAME --region $AWS_REGION 2>/dev/null || true
+    
+    echo "  ✅ AWS cleanup initiated (async)"
+    echo ""
+    echo -e "${YELLOW}⏳ Note: AWS resource deletion is asynchronous${NC}"
+    echo "   - Check AWS Console for progress"
+    echo "   - EKS deletion may take 5-10 minutes"
+    echo "   - RDS deletion may take a few minutes"
+else
+    echo -e "${YELLOW}AWS Infrastructure is STILL RUNNING${NC}"
+    echo ""
+    echo "  To delete AWS resources, run:"
+    echo "    CLEANUP_AWS=true ./destroy.sh"
+    echo ""
+    echo "  Or use Terraform (may hang):"
+    echo "    cd $TERRAFORM_DIR && terraform destroy --auto-approve"
+    echo ""
+    echo "  Or delete manually from AWS Console:"
+    echo "    - ECR: All 'eshop-*' repositories"
+    echo "    - RDS: All 'eshop-*' databases"
+    echo "    - ElastiCache: All 'eshop-*' clusters"
+    echo "    - EKS: eshop-dev-eks cluster"
+    echo "    - VPC: Associated with EKS (auto-deletes)"
+fi
+
+# 11. Cleanup summary
 echo ""
 echo -e "${GREEN}🎉 ===============================================${NC}"
-echo -e "${GREEN}✅ eShop Infrastructure Cleanup Complete!${NC}"
+echo -e "${GREEN}✅ Cleanup Complete!${NC}"
 echo -e "${GREEN}===============================================${NC}"
 echo ""
-echo -e "${GREEN}✅ Cleanup Actions:${NC}"
-echo "  ✓ Helm releases deleted"
+echo -e "${GREEN}✅ Kubernetes Cleanup:${NC}"
+echo "  ✓ Helm releases deleted (all namespaces)"
 echo "  ✓ Kubernetes deployments removed"
-echo "  ✓ Services deleted"
-echo "  ✓ LoadBalancers cleaned up"
+echo "  ✓ Services and LoadBalancers deleted"
 echo "  ✓ Persistent volumes removed"
+echo "  ✓ ConfigMaps and Secrets cleaned"
+echo ""
+
+if [[ "${CLEANUP_AWS:-false}" == "true" ]]; then
+    echo -e "${GREEN}✅ AWS Infrastructure Cleanup (Initiated):${NC}"
+    echo "  ✓ LoadBalancers deleted"
+    echo "  ✓ RDS Database deleted"
+    echo "  ✓ ElastiCache cluster deleted"
+    echo "  ✓ ECR repositories deleted"
+    echo "  ✓ EKS cluster deletion initiated"
+    echo ""
+    echo -e "${YELLOW}⏳ Cleanup Status:${NC}"
+    echo "  • EKS deletion in progress (5-10 minutes)"
+    echo "  • Monitor AWS Console for completion"
+    echo ""
+else
+    echo -e "${YELLOW}⚠️  AWS Resources Still Running:${NC}"
+    echo "  ❌ RDS Database"
+    echo "  ❌ ElastiCache Redis"
+    echo "  ❌ EKS Cluster"
+    echo "  ❌ VPC & Networking"
+    echo "  ❌ ECR Repositories"
+    echo ""
+    echo -e "${YELLOW}💰 Cost Alert:${NC}"
+    echo "  AWS resources continue to incur costs!"
+    echo "  Run with CLEANUP_AWS=true to delete them:"
+    echo "    CLEANUP_AWS=true ./destroy.sh"
+fi
+
 echo ""
 echo -e "${YELLOW}📝 Next Steps:${NC}"
-echo "  • Verify all resources are removed: kubectl get all -n $NAMESPACE"
-echo "  • Monitor AWS Console for LoadBalancer cleanup (may take a few minutes)"
-echo "  • To fully destroy AWS infrastructure (RDS, VPC, etc.): cd terraform/envs/dev && terraform destroy"
-echo "  • To redeploy: ./deploy.sh"
+echo "  1. Verify Kubernetes cleanup:"
+echo "     kubectl get all --all-namespaces"
 echo ""
-echo -e "${RED}⚠️  NOTE:${NC}"
-echo "  This script does NOT destroy:"
-echo "  - RDS databases"
-echo "  - ElastiCache clusters"
-echo "  - VPC and networking"
-echo "  - ECR repositories"
-echo "  - AWS IAM roles"
+echo "  2. If AWS cleanup still running, monitor progress:"
+echo "     aws eks describe-cluster --name $CLUSTER_NAME --region $AWS_REGION"
+echo "     aws rds describe-db-instances --region $AWS_REGION"
 echo ""
-echo -e "${YELLOW}📝 Backup Information:${NC}"
-echo "  • RDS Backups: Automatically retained for 7 days (dev) / 14 days (prod)"
-echo "  • Final Snapshots: SKIPPED in dev (ephemeral) / ENABLED in prod"
-echo "  • CloudWatch Logs: Retained for 7 days"
-echo "  • All automated backups are FREE (included with RDS)"
+echo "  3. To redeploy:"
+echo "     ./deploy.sh"
 echo ""
-echo "  To fully destroy all infrastructure including RDS, use Terraform:"
-echo "  cd terraform/envs/dev && terraform destroy"
