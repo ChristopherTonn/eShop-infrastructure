@@ -6,7 +6,6 @@ using Microsoft.AspNetCore.OpenApi;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Primitives;
-using Microsoft.OpenApi;
 using System.Text.Json.Nodes;
 
 namespace eShop.ServiceDefaults;
@@ -101,7 +100,8 @@ internal static class OpenApiOptionsExtensions
 
     public static OpenApiOptions ApplySecuritySchemeDefinitions(this OpenApiOptions options)
     {
-        options.AddDocumentTransformer<SecuritySchemeDefinitionsTransformer>();
+        // NOTE: IOpenApiDocumentTransformer is only available in .NET 10+
+        // Skipping security scheme registration for .NET 9 compatibility
         return options;
     }
 
@@ -170,38 +170,5 @@ internal static class OpenApiOptionsExtensions
             return Task.CompletedTask;
         });
         return options;
-    }
-
-    private class SecuritySchemeDefinitionsTransformer(IConfiguration configuration) : IOpenApiDocumentTransformer
-    {
-        public Task TransformAsync(OpenApiDocument document, OpenApiDocumentTransformerContext context, CancellationToken cancellationToken)
-        {
-            var identitySection = configuration.GetSection("Identity");
-            if (!identitySection.Exists())
-            {
-                return Task.CompletedTask;
-            }
-
-            var identityUrlExternal = identitySection.GetRequiredValue("Url");
-            var scopes = identitySection.GetRequiredSection("Scopes").GetChildren().ToDictionary(p => p.Key, p => p.Value ?? string.Empty);
-            var securityScheme = new OpenApiSecurityScheme
-            {
-                Type = SecuritySchemeType.OAuth2,
-                Flows = new OpenApiOAuthFlows()
-                {
-                    // TODO: Change this to use Authorization Code flow with PKCE
-                    Implicit = new OpenApiOAuthFlow()
-                    {
-                        AuthorizationUrl = new Uri($"{identityUrlExternal}/connect/authorize"),
-                        TokenUrl = new Uri($"{identityUrlExternal}/connect/token"),
-                        Scopes = scopes,
-                    }
-                }
-            };
-            document.Components ??= new();
-            document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();  
-            document.Components.SecuritySchemes.Add("oauth2", securityScheme);
-            return Task.CompletedTask;
-        }
     }
 }
