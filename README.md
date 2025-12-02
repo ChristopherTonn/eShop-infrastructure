@@ -2,13 +2,50 @@
 
 A reference .NET application implementing an e-commerce website using a services-based architecture using [.NET Aspire](https://learn.microsoft.com/dotnet/aspire/).
 
-![eShop Reference Application architecture diagram](img/eshop_architecture.png)
+![eShop Reference Application architecture diagram](docs/img/eshop_architecture.png)
 
-![eShop homepage screenshot](img/eshop_homepage.png)
+![eShop homepage screenshot](docs/img/eshop_homepage.png)
 
 ## Getting Started
 
-This version of eShop is based on .NET 9. 
+This version of eShop is based on .NET 9.
+
+📚 **Full documentation:** Start with [Getting Started Guide](docs/GETTING_STARTED.md) or explore the [Documentation Index](docs/INDEX.md)
+
+### Quick Start (5 minutes)
+
+**Local Development:**
+```bash
+cd codebase
+dotnet restore
+dotnet run --project src/eShop.AppHost
+# Open: http://localhost:15213 (Aspire Dashboard)
+```
+
+**Infrastructure Deployment:**
+```bash
+cd infra
+./deploy-infrastructure.sh
+./deploy-application.sh
+```
+
+### 📖 Documentation
+
+| Resource | Purpose |
+|----------|---------|
+| [📚 Documentation Index](docs/INDEX.md) | Navigate docs by role |
+| [🚀 Getting Started](docs/GETTING_STARTED.md) | Setup & first steps |
+| [🏗️ Architecture](docs/ARCHITECTURE.md) | System design & components |
+| [🔧 Infrastructure](docs/infrastructure/README.md) | Cloud setup & Terraform |
+| [🚨 Runbooks](docs/runbooks/) | Operational procedures |
+| [🔄 CI/CD Workflows](docs/CI-CD.md) | Automated testing & deployment |
+
+**Choose your path:**
+- **👨‍💻 Developers:** [Local Development Setup](docs/GETTING_STARTED.md#-i-want-to-develop-locally)
+- **🏗️ DevOps/SREs:** [Infrastructure Overview](docs/infrastructure/README.md)
+- **📊 Operators:** [Runbooks & Operations](docs/runbooks/)
+
+---
 
 Previous eShop versions:
 * [.NET 8](https://github.com/dotnet/eShop/tree/release/8.0)
@@ -72,7 +109,7 @@ get-WinGetConfiguration -file .\.configurations\vscode.dsc.yaml | Invoke-WinGetC
 
 * Or run the application from your terminal:
 ```powershell
-dotnet run --project src/eShop.AppHost/eShop.AppHost.csproj
+dotnet run --project codebase/src/eShop.AppHost/eShop.AppHost.csproj
 ```
 then look for lines like this in the console output in order to find the URL to open the Aspire dashboard:
 ```sh
@@ -135,7 +172,7 @@ For more information on contributing to this repo, read [the contribution docume
 
 ### Sample data
 
-The sample catalog data is defined in [catalog.json](https://github.com/dotnet/eShop/blob/main/src/Catalog.API/Setup/catalog.json). Those product names, descriptions, and brand names are fictional and were generated using [GPT-35-Turbo](https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/chatgpt), and the corresponding [product images](https://github.com/dotnet/eShop/tree/main/src/Catalog.API/Pics) were generated using [DALL·E 3](https://openai.com/dall-e-3).
+The sample catalog data is defined in [catalog.json](https://github.com/dotnet/eShop/blob/main/codebase/src/Catalog.API/Setup/catalog.json). Those product names, descriptions, and brand names are fictional and were generated using [GPT-35-Turbo](https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/chatgpt), and the corresponding [product images](https://github.com/dotnet/eShop/tree/main/codebase/src/Catalog.API/Pics) were generated using [DALL·E 3](https://openai.com/dall-e-3).
 
 ## eShop on Azure
 

@@ -55,17 +55,17 @@ jobs:
             ${{ runner.os }}-nuget-
 
       - name: 🔄 Restore Dependencies
-        run: dotnet restore src/${{ matrix.service }}/${{ matrix.service }}.csproj
+        run: dotnet restore codebase/src/${{ matrix.service }}/${{ matrix.service }}.csproj
         env:
           NUGET_PACKAGES: ${{ runner.temp }}/nuget-cache
 
       - name: 🏗️ Build Service
-        run: dotnet build src/${{ matrix.service }}/${{ matrix.service }}.csproj --no-restore --configuration ${{ env.DOTNET_CONFIGURATION }}
+        run: dotnet build codebase/src/${{ matrix.service }}/${{ matrix.service }}.csproj --no-restore --configuration ${{ env.DOTNET_CONFIGURATION }}
 
       - name: 🧪 Run Unit Tests
         run: |
           if [ -d "tests" ]; then
-            TEST_PROJECT=$(find tests -name "*$(basename ${{ matrix.service }})*.csproj" | head -1)
+            TEST_PROJECT=$(find codebase/tests -name "*$(basename ${{ matrix.service }})*.csproj" | head -1)
             if [ -n "$TEST_PROJECT" ]; then
               echo "Running tests for: $TEST_PROJECT"
               dotnet test "$TEST_PROJECT" --no-build --configuration ${{ env.DOTNET_CONFIGURATION }} --verbosity normal --logger trx --results-directory TestResults/
@@ -141,12 +141,12 @@ jobs:
             ${{ runner.os }}-nuget-
 
       - name: 🔄 Restore Solution
-        run: dotnet restore eShop.Web.slnf
+        run: dotnet restore codebase/eShop.Web.slnf
         env:
           NUGET_PACKAGES: ${{ runner.temp }}/nuget-cache
 
       - name: 🏗️ Build Solution
-        run: dotnet build eShop.Web.slnf --no-restore --configuration ${{ env.DOTNET_CONFIGURATION }}
+        run: dotnet build codebase/eShop.Web.slnf --no-restore --configuration ${{ env.DOTNET_CONFIGURATION }}
 
       - name: 📦 Publish Applications
         run: |

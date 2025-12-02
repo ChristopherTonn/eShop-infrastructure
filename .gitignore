@@ -500,3 +500,12 @@ infra/terraform/**/.terraform/
 infra/terraform/**/.terraform.lock.hcl
 infra/terraform/**/terraform.tfstate*
 infra/terraform/**/tfplan
+
+# Log files and temporary outputs
+*.log
+deployment.log
+deploy.log
+
+# OS and IDE generated files
+.DS_Store
+Thumbs.db

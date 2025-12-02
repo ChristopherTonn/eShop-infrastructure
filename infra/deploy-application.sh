@@ -186,9 +186,9 @@ if [ "$SKIP_BUILD" = false ]; then
     log_section "Step 4: Build and Push Docker Images"
     
     log_info "Building AppHost project..."
-    cd "$PROJECT_ROOT"
+    cd "$PROJECT_ROOT/codebase"
     
-    if [ -f "eShop.slnx" ]; then
+    if [ -f "codebase/eShop.slnx" ]; then
         log_info "Using dotnet publish with eShop.slnx..."
         # This would build and publish images
         # Implementation depends on AppHost configuration

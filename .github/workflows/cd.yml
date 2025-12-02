@@ -152,16 +152,16 @@ jobs:
         run: |
           # Convert kebab-case to PascalCase for source mapping
           case "${{ matrix.service }}" in
-            "basket-api") SOURCE_DIR="src/Basket.API" ;;
-            "catalog-api") SOURCE_DIR="src/Catalog.API" ;;
-            "identity-api") SOURCE_DIR="src/Identity.API" ;;
-            "ordering-api") SOURCE_DIR="src/Ordering.API" ;;
-            "order-processor") SOURCE_DIR="src/OrderProcessor" ;;
-            "payment-processor") SOURCE_DIR="src/PaymentProcessor" ;;
-            "webhooks-api") SOURCE_DIR="src/Webhooks.API" ;;
-            "webapp") SOURCE_DIR="src/WebApp" ;;
-            "webhook-client") SOURCE_DIR="src/WebhookClient" ;;
-            *) SOURCE_DIR="src/${{ matrix.service }}" ;;
+            "basket-api") SOURCE_DIR="codebase/src/Basket.API" ;;
+            "catalog-api") SOURCE_DIR="codebase/src/Catalog.API" ;;
+            "identity-api") SOURCE_DIR="codebase/src/Identity.API" ;;
+            "ordering-api") SOURCE_DIR="codebase/src/Ordering.API" ;;
+            "order-processor") SOURCE_DIR="codebase/src/OrderProcessor" ;;
+            "payment-processor") SOURCE_DIR="codebase/src/PaymentProcessor" ;;
+            "webhooks-api") SOURCE_DIR="codebase/src/Webhooks.API" ;;
+            "webapp") SOURCE_DIR="codebase/src/WebApp" ;;
+            "webhook-client") SOURCE_DIR="codebase/src/WebhookClient" ;;
+            *) SOURCE_DIR="codebase/src/${{ matrix.service }}" ;;
           esac
           
           echo "source-dir=$SOURCE_DIR" >> $GITHUB_OUTPUT
