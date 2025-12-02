@@ -116,6 +116,58 @@ The pipeline stages:
 
 ---
 
+## 🔐 AWS IAM User Setup (Security Best Practice)
+
+⚠️ **IMPORTANT**: Never use the AWS Root User for deployments. This project uses an **IAM User with Least Privilege** permissions.
+
+### Quick Setup
+
+1. **Create IAM User** (AWS Console):
+
+   - User name: `eshop-terraform-user`
+   - Grant `Programmatic Access` (Access Key + Secret)
+   - Attach policy from [`iam-policy-eshop-terraform.json`](./iam-policy-eshop-terraform.json)
+
+2. **Configure Local Credentials**:
+
+   ```bash
+   # Edit ~/.aws/credentials
+   [eshop-terraform]
+   aws_access_key_id = AKIA...
+   aws_secret_access_key = ...
+   region = eu-central-1
+   ```
+
+3. **Verify Setup**:
+
+   ```bash
+   aws sts get-caller-identity --profile eshop-terraform
+   ```
+
+4. **Use in Scripts**:
+
+   ```bash
+   # Automatic (uses AWS_PROFILE env var)
+   export AWS_PROFILE=eshop-terraform
+   ./deploy.sh
+
+   # Or explicit
+   AWS_PROFILE=eshop-terraform ./infra/deploy.sh
+   ```
+
+### Security Best Practices
+
+✅ Use IAM User instead of Root (this project)  
+✅ Least Privilege - only required permissions  
+✅ Credentials in `~/.aws/credentials` (NOT in repo)  
+✅ Rotate Access Keys every 90 days  
+✅ Enable MFA for Root Account  
+✅ Use Terraform State with encryption (S3 + DynamoDB)
+
+**For detailed setup, see**: [`IAM_SETUP_GUIDE.md`](./IAM_SETUP_GUIDE.md)
+
+---
+
 ## 🔒 Security
 
 - AWS IAM roles follow **least privilege** principles

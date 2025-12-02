@@ -38,7 +38,7 @@ terraform output grafana_admin_password
 ### 4. Dashboards öffnen
 
 - Prometheus: http://localhost:9090
-- Grafana: http://localhost:3000 (admin / <password>)
+- Grafana: http://localhost:3000 (admin / PASSWORD)
 
 **Das war's!** Stack ist einsatzbereit.
 

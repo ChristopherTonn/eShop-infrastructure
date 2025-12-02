@@ -38,7 +38,8 @@ terraform {
 # ============================================================================
 
 provider "aws" {
-  region = var.aws_region
+  profile = var.aws_profile
+  region  = var.aws_region
 
   default_tags {
     tags = merge(var.common_tags, {
@@ -46,6 +47,21 @@ provider "aws" {
       CostCenter  = "dev-ops"
     })
   }
+}
+
+provider "kubernetes" {
+  # Phase 1: Provider will be configured after EKS is ready
+  # Temporary empty config to avoid provider initialization errors
+}
+
+provider "helm" {
+  # Phase 1: Provider will be configured after EKS is ready
+  # Temporary empty config to avoid provider initialization errors
+}
+
+# Get cluster auth token
+data "aws_eks_cluster_auth" "cluster" {
+  name = module.eks.cluster_name
 }
 
 # ============================================================================
@@ -60,10 +76,10 @@ locals {
   vpc_cidr = "10.0.0.0/16"
 
   # Smaller instances for dev
-  eks_node_instance_types = ["t3.medium"]
-  eks_desired_size        = 2
-  eks_min_size            = 1
-  eks_max_size            = 5
+  eks_node_instance_types = var.eks_node_instance_types != null ? var.eks_node_instance_types : ["t3.medium"]
+  eks_desired_size        = var.eks_desired_size != null ? var.eks_desired_size : 1
+  eks_min_size            = var.eks_min_size != null ? var.eks_min_size : 1
+  eks_max_size            = var.eks_max_size != null ? var.eks_max_size : 2
 
   rds_instance_class    = "db.t3.micro"
   rds_allocated_storage = 20
@@ -134,6 +150,7 @@ module "eks" {
   min_size            = local.eks_min_size
   max_size            = local.eks_max_size
   desired_size        = local.eks_desired_size
+  ssh_key_name        = var.eks_node_ssh_key
 
   tags = merge(var.common_tags, {
     Environment = "development"
@@ -224,7 +241,7 @@ module "secrets_manager" {
 module "k8s_csi_driver" {
   source = "../../modules/k8s-csi-driver"
 
-  enabled             = true
+  enabled             = false  # Disabled - wegen K8s Provider Issue
   cluster_name        = module.eks.cluster_name
   oidc_provider_arn   = module.eks.oidc_provider_arn
   oidc_provider_url   = module.eks.oidc_provider_url
@@ -276,6 +293,8 @@ module "rabbitmq" {
   tags = merge(var.common_tags, {
     Environment = "development"
   })
+
+  depends_on = [module.eks]
 }
 
 # ============================================================================

@@ -247,7 +247,7 @@ Content includes:
 
 **Example**:
 
-```
+```text
 🚨 CRITICAL ALERT 🚨
 
 Alert: ServiceDown

@@ -3,6 +3,12 @@
 # ============================================================================
 
 # AWS Configuration
+variable "aws_profile" {
+  description = "AWS CLI profile to use (for IAM User support)"
+  type        = string
+  default     = "eshop-terraform"
+}
+
 variable "aws_region" {
   description = "AWS region for infrastructure deployment"
   type        = string
@@ -43,14 +49,20 @@ variable "enable_vpc_flow_logs" {
 variable "eks_cluster_version" {
   description = "Kubernetes version for EKS cluster"
   type        = string
-  default     = "1.28"
+  default     = "1.29"
+}
+
+variable "eks_node_instance_types" {
+  description = "Instance types for EKS node groups"
+  type        = list(string)
+  default     = ["t3.medium"]
 }
 
 # RDS Configuration
 variable "rds_engine_version" {
   description = "PostgreSQL engine version"
   type        = string
-  default     = "15.3"
+  default     = "15.10"
 }
 
 variable "rds_master_username" {
@@ -76,6 +88,13 @@ variable "rds_skip_final_snapshot" {
   description = "Skip creation of final snapshot when destroying RDS instance"
   type        = bool
   default     = false
+}
+
+# EKS SSH Key Configuration
+variable "eks_node_ssh_key" {
+  description = "EC2 SSH Key name for EKS node group access"
+  type        = string
+  default     = ""
 }
 
 # ElastiCache Configuration
@@ -447,9 +466,60 @@ variable "alertmanager_smtp_password" {
   sensitive   = true
 }
 
-variable "alertmanager_enabled" {
-  description = "Enable Alertmanager with email notifications"
+# Ergänzung: Fehlende Variablen für tfvars
+variable "eks_desired_size" {
+  description = "Anzahl gewünschter EKS-Nodes"
+  type        = number
+  default     = 1
+}
+
+variable "eks_min_size" {
+  description = "Minimale Anzahl EKS-Nodes"
+  type        = number
+  default     = 1
+}
+
+variable "eks_max_size" {
+  description = "Maximale Anzahl EKS-Nodes"
+  type        = number
+  default     = 2
+}
+
+variable "elasticache_automatic_failover_enabled" {
+  description = "ElastiCache: Automatisches Failover aktivieren"
+  type        = bool
+  default     = false
+}
+
+variable "elasticache_multi_az_enabled" {
+  description = "ElastiCache: Multi-AZ aktivieren"
+  type        = bool
+  default     = false
+}
+
+variable "elasticache_at_rest_encryption_enabled" {
+  description = "ElastiCache: Verschlüsselung im Ruhezustand aktivieren"
   type        = bool
   default     = true
 }
+
+variable "elasticache_transit_encryption_enabled" {
+  description = "ElastiCache: Verschlüsselung im Transit aktivieren"
+  type        = bool
+  default     = true
+}
+
+variable "elasticache_auth_token" {
+  description = "ElastiCache Auth Token"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "rds_allocated_storage" {
+  description = "RDS: Allocated Storage in GB"
+  type        = number
+  default     = 20
+}
+
 

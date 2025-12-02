@@ -130,7 +130,7 @@ kubectl port-forward -n monitoring svc/kube-prometheus-stack-alertmanager 9093:9
 Access URLs:
 
 - Prometheus: http://localhost:9090
-- Grafana: http://localhost:3000 (admin / <password>)
+- Grafana: http://localhost:3000 (admin / PASSWORD)
 - Alertmanager: http://localhost:9093
 
 ### 3.2 In-Cluster Access

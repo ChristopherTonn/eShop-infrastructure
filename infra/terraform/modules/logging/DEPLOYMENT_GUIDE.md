@@ -426,7 +426,7 @@ fields @timestamp, kubernetes.pod_name, @duration_ms
 
 ### 6.5 Database Errors
 
-```
+```sql
 fields @timestamp, @message, kubernetes.pod_name
 | filter @message like /(?i)(database|sql|connection|timeout)/
 | stats count() as db_error_count by kubernetes.pod_name
@@ -434,7 +434,7 @@ fields @timestamp, @message, kubernetes.pod_name
 
 ### 6.6 RabbitMQ Message Queue Analysis
 
-```
+```sql
 fields @timestamp, queue_name, message_count
 | filter kubernetes.pod_name like /rabbitmq/
 | stats sum(message_count) as total_messages, avg(message_count) by queue_name
@@ -442,7 +442,7 @@ fields @timestamp, queue_name, message_count
 
 ### 6.7 Pod Restart Detection
 
-```
+```sql
 fields @timestamp, kubernetes.pod_name, kubernetes.namespace_name
 | filter @message like /(?i)(restarting|restart|terminating|crash)/
 | stats count() as restart_count by kubernetes.pod_name
@@ -450,7 +450,7 @@ fields @timestamp, kubernetes.pod_name, kubernetes.namespace_name
 
 ### 6.8 Application Startup Logs
 
-```
+```sql
 fields @timestamp, kubernetes.pod_name, @message
 | filter @message like /(?i)(started|initialization|bootstrap|listening|ready)/
 | stats latest(@timestamp) as last_startup by kubernetes.pod_name
@@ -460,7 +460,7 @@ fields @timestamp, kubernetes.pod_name, @message
 
 ### Configuration File Location
 
-```
+```text
 Pod: fluent-bit-xxxxx (any pod in logging namespace)
 Main Config: /fluent-bit/etc/fluent-bit.conf
 Custom Parsers: /fluent-bit/etc/custom-parsers.conf

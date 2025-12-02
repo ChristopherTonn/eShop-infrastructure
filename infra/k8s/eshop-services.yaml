@@ -1,0 +1,911 @@
+# ============================================================================
+# eShop Microservices - Complete Kubernetes Deployment
+# CTO-Level Production Setup with all eShop Services
+# ============================================================================
+
+---
+# ============================================================================
+# Namespace
+# ============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: eshop-services
+  labels:
+    app: eshop
+
+---
+# ============================================================================
+# ConfigMaps - Application Configuration
+# ============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: eshop-config
+  namespace: eshop-services
+data:
+  # Database Configuration
+  DB_HOST: "eshop-rds-instance.c9akciq32.eu-central-1.rds.amazonaws.com"
+  DB_PORT: "5432"
+  DB_NAME: "eshop"
+  DB_USER: "postgres"
+
+  # Redis Cache Configuration
+  REDIS_HOST: "eshop-elasticache.xxx.cache.amazonaws.com"
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"
+
+  # RabbitMQ Configuration
+  RABBITMQ_HOST: "rabbitmq-headless.rabbitmq.svc.cluster.local"
+  RABBITMQ_PORT: "5672"
+  RABBITMQ_USER: "guest"
+  RABBITMQ_VHOST: "/"
+
+  # Service URLs (Internal Service Discovery)
+  IDENTITY_URL: "http://identity-api:5001"
+  CATALOG_URL: "http://catalog-api:5010"
+  BASKET_URL: "http://basket-api:5011"
+  ORDERING_URL: "http://ordering-api:5012"
+  WEBHOOKS_URL: "http://webhooks-api:5013"
+
+  # Logging & Monitoring
+  LOG_LEVEL: "Information"
+  ASPNETCORE_ENVIRONMENT: "Production"
+
+---
+# ============================================================================
+# Secrets - Sensitive Data (from AWS Secrets Manager via CSI Driver)
+# ============================================================================
+apiVersion: v1
+kind: Secret
+metadata:
+  name: eshop-secrets
+  namespace: eshop-services
+type: Opaque
+stringData:
+  DB_PASSWORD: "DevPassword123!@#" # Should come from Secrets Manager in prod
+  RABBITMQ_PASSWORD: "DevRabbitPassword123!@#"
+  JWT_SECRET: "dev-jwt-signing-secret-key-min-32-chars-required-long-string"
+  REDIS_PASSWORD: "DevRedisAuth123!@#Dev"
+
+---
+# ============================================================================
+# Service: Identity API
+# ============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: identity-api
+  namespace: eshop-services
+  labels:
+    app: identity-api
+spec:
+  type: ClusterIP
+  selector:
+    app: identity-api
+  ports:
+    - port: 5001
+      targetPort: 5001
+      protocol: TCP
+      name: http
+
+---
+# Deployment: Identity API
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: identity-api
+  namespace: eshop-services
+  labels:
+    app: identity-api
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: identity-api
+  template:
+    metadata:
+      labels:
+        app: identity-api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "5001"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: eshop-services
+      containers:
+        - name: identity-api
+          image: $DOCKER_REGISTRY/eshop-identity:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5001
+              name: http
+          envFrom:
+            - configMapRef:
+                name: eshop-config
+            - secretRef:
+                name: eshop-secrets
+          env:
+            - name: SERVICE_NAME
+              value: "Identity.API"
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 5001
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 5001
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: false
+
+---
+# ============================================================================
+# Service: Catalog API
+# ============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: catalog-api
+  namespace: eshop-services
+  labels:
+    app: catalog-api
+spec:
+  type: ClusterIP
+  selector:
+    app: catalog-api
+  ports:
+    - port: 5010
+      targetPort: 5010
+      protocol: TCP
+      name: http
+
+---
+# Deployment: Catalog API
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalog-api
+  namespace: eshop-services
+  labels:
+    app: catalog-api
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: catalog-api
+  template:
+    metadata:
+      labels:
+        app: catalog-api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "5010"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: eshop-services
+      containers:
+        - name: catalog-api
+          image: $DOCKER_REGISTRY/eshop-catalog:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5010
+              name: http
+          envFrom:
+            - configMapRef:
+                name: eshop-config
+            - secretRef:
+                name: eshop-secrets
+          env:
+            - name: SERVICE_NAME
+              value: "Catalog.API"
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 5010
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 5010
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: false
+
+---
+# ============================================================================
+# Service: Basket API
+# ============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: basket-api
+  namespace: eshop-services
+  labels:
+    app: basket-api
+spec:
+  type: ClusterIP
+  selector:
+    app: basket-api
+  ports:
+    - port: 5011
+      targetPort: 5011
+      protocol: TCP
+      name: http
+
+---
+# Deployment: Basket API
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: basket-api
+  namespace: eshop-services
+  labels:
+    app: basket-api
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: basket-api
+  template:
+    metadata:
+      labels:
+        app: basket-api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "5011"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: eshop-services
+      containers:
+        - name: basket-api
+          image: $DOCKER_REGISTRY/eshop-basket:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5011
+              name: http
+          envFrom:
+            - configMapRef:
+                name: eshop-config
+            - secretRef:
+                name: eshop-secrets
+          env:
+            - name: SERVICE_NAME
+              value: "Basket.API"
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 5011
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 5011
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: false
+
+---
+# ============================================================================
+# Service: Ordering API
+# ============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: ordering-api
+  namespace: eshop-services
+  labels:
+    app: ordering-api
+spec:
+  type: ClusterIP
+  selector:
+    app: ordering-api
+  ports:
+    - port: 5012
+      targetPort: 5012
+      protocol: TCP
+      name: http
+
+---
+# Deployment: Ordering API
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ordering-api
+  namespace: eshop-services
+  labels:
+    app: ordering-api
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: ordering-api
+  template:
+    metadata:
+      labels:
+        app: ordering-api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "5012"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: eshop-services
+      containers:
+        - name: ordering-api
+          image: $DOCKER_REGISTRY/eshop-ordering:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5012
+              name: http
+          envFrom:
+            - configMapRef:
+                name: eshop-config
+            - secretRef:
+                name: eshop-secrets
+          env:
+            - name: SERVICE_NAME
+              value: "Ordering.API"
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 5012
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 5012
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: false
+
+---
+# ============================================================================
+# Service: Webhooks API
+# ============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: webhooks-api
+  namespace: eshop-services
+  labels:
+    app: webhooks-api
+spec:
+  type: ClusterIP
+  selector:
+    app: webhooks-api
+  ports:
+    - port: 5013
+      targetPort: 5013
+      protocol: TCP
+      name: http
+
+---
+# Deployment: Webhooks API
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webhooks-api
+  namespace: eshop-services
+  labels:
+    app: webhooks-api
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: webhooks-api
+  template:
+    metadata:
+      labels:
+        app: webhooks-api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "5013"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: eshop-services
+      containers:
+        - name: webhooks-api
+          image: $DOCKER_REGISTRY/eshop-webhooks:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5013
+              name: http
+          envFrom:
+            - configMapRef:
+                name: eshop-config
+            - secretRef:
+                name: eshop-secrets
+          env:
+            - name: SERVICE_NAME
+              value: "Webhooks.API"
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 5013
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 5013
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 250m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: false
+
+---
+# ============================================================================
+# Job: Order Processor (Background Processing)
+# ============================================================================
+apiVersion: batch/v1
+kind: Deployment
+metadata:
+  name: order-processor
+  namespace: eshop-services
+  labels:
+    app: order-processor
+    component: background-worker
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: order-processor
+  template:
+    metadata:
+      labels:
+        app: order-processor
+        component: background-worker
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "5014"
+    spec:
+      serviceAccountName: eshop-services
+      containers:
+        - name: order-processor
+          image: $DOCKER_REGISTRY/eshop-order-processor:latest
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: eshop-config
+            - secretRef:
+                name: eshop-secrets
+          env:
+            - name: SERVICE_NAME
+              value: "OrderProcessor"
+            - name: WORKER_TYPE
+              value: "OrderProcessing"
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - test -f /tmp/healthy
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: false
+
+---
+# ============================================================================
+# Job: Payment Processor (Background Processing)
+# ============================================================================
+apiVersion: batch/v1
+kind: Deployment
+metadata:
+  name: payment-processor
+  namespace: eshop-services
+  labels:
+    app: payment-processor
+    component: background-worker
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: payment-processor
+  template:
+    metadata:
+      labels:
+        app: payment-processor
+        component: background-worker
+    spec:
+      serviceAccountName: eshop-services
+      containers:
+        - name: payment-processor
+          image: $DOCKER_REGISTRY/eshop-payment-processor:latest
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: eshop-config
+            - secretRef:
+                name: eshop-secrets
+          env:
+            - name: SERVICE_NAME
+              value: "PaymentProcessor"
+            - name: WORKER_TYPE
+              value: "PaymentProcessing"
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - test -f /tmp/healthy
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: false
+
+---
+# ============================================================================
+# Service: WebApp (Frontend)
+# ============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: webapp
+  namespace: eshop-services
+  labels:
+    app: webapp
+spec:
+  type: LoadBalancer
+  selector:
+    app: webapp
+  ports:
+    - port: 80
+      targetPort: 8080
+      protocol: TCP
+      name: http
+
+---
+# Deployment: WebApp (Frontend)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp
+  namespace: eshop-services
+  labels:
+    app: webapp
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: webapp
+  template:
+    metadata:
+      labels:
+        app: webapp
+    spec:
+      serviceAccountName: eshop-services
+      containers:
+        - name: webapp
+          image: $DOCKER_REGISTRY/eshop-webapp:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              name: http
+          envFrom:
+            - configMapRef:
+                name: eshop-config
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: "Production"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: false
+
+---
+# ============================================================================
+# Service: Webhook Client
+# ============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: webhook-client
+  namespace: eshop-services
+  labels:
+    app: webhook-client
+spec:
+  type: ClusterIP
+  selector:
+    app: webhook-client
+  ports:
+    - port: 5014
+      targetPort: 5014
+      protocol: TCP
+      name: http
+
+---
+# Deployment: Webhook Client
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webhook-client
+  namespace: eshop-services
+  labels:
+    app: webhook-client
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: webhook-client
+  template:
+    metadata:
+      labels:
+        app: webhook-client
+    spec:
+      serviceAccountName: eshop-services
+      containers:
+        - name: webhook-client
+          image: $DOCKER_REGISTRY/eshop-webhook-client:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5014
+              name: http
+          envFrom:
+            - configMapRef:
+                name: eshop-config
+            - secretRef:
+                name: eshop-secrets
+          env:
+            - name: SERVICE_NAME
+              value: "WebhookClient"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5014
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5014
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 250m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: false
+
+---
+# ============================================================================
+# ServiceAccount for eShop Services
+# ============================================================================
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: eshop-services
+  namespace: eshop-services
+  labels:
+    app: eshop
+
+---
+# ============================================================================
+# Horizontal Pod Autoscaler - APIs
+# ============================================================================
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api-scaler
+  namespace: eshop-services
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: catalog-api
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+
+---
+# ============================================================================
+# Horizontal Pod Autoscaler - WebApp
+# ============================================================================
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: webapp-scaler
+  namespace: eshop-services
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: webapp
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80

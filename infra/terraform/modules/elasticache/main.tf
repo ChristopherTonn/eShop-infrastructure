@@ -2,18 +2,25 @@
 # ElastiCache Module - Main Configuration
 # ============================================================================
 
+# Data source for current AWS account ID
+data "aws_caller_identity" "current" {}
+
 # ============================================================================
 # ElastiCache Subnet Group
 # ============================================================================
 
 resource "aws_elasticache_subnet_group" "main" {
-  name       = "${var.name_prefix}-cache-subnet-group"
+  name       = "${var.name_prefix}-cache-subnet-${data.aws_caller_identity.current.account_id}"
   subnet_ids = var.private_subnet_ids
 
   tags = merge(var.tags, {
     Name = "${var.name_prefix}-cache-subnet-group"
     Type = "elasticache-subnet-group"
   })
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # ============================================================================
@@ -51,7 +58,7 @@ resource "aws_security_group" "elasticache" {
 
 resource "aws_elasticache_parameter_group" "main" {
   family = "redis7"
-  name   = "${var.name_prefix}-redis-params"
+  name   = "${var.name_prefix}-redis-params-${data.aws_caller_identity.current.account_id}"
 
   parameter {
     name  = "maxmemory-policy"
@@ -72,6 +79,10 @@ resource "aws_elasticache_parameter_group" "main" {
     Name = "${var.name_prefix}-redis-params"
     Type = "elasticache-parameter-group"
   })
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # ============================================================================

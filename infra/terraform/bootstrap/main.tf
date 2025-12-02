@@ -5,7 +5,7 @@
 # ============================================================================
 
 terraform {
-  required_version = ">= 1.6"
+  required_version = ">= 1.5"
   
   required_providers {
     aws = {
@@ -52,7 +52,7 @@ variable "project_name" {
 # ============================================================================
 
 resource "aws_s3_bucket" "terraform_state_dev" {
-  bucket = "${var.project_name}-terraform-state-dev"
+  bucket = "${var.project_name}-terraform-state-dev-333917886778"
 
   tags = {
     Name        = "${var.project_name}-terraform-state-dev"
@@ -62,7 +62,7 @@ resource "aws_s3_bucket" "terraform_state_dev" {
 }
 
 resource "aws_s3_bucket" "terraform_state_staging" {
-  bucket = "${var.project_name}-terraform-state-staging"
+  bucket = "${var.project_name}-terraform-state-staging-333917886778"
 
   tags = {
     Name        = "${var.project_name}-terraform-state-staging"
@@ -72,7 +72,7 @@ resource "aws_s3_bucket" "terraform_state_staging" {
 }
 
 resource "aws_s3_bucket" "terraform_state_prod" {
-  bucket = "${var.project_name}-terraform-state-prod"
+  bucket = "${var.project_name}-terraform-state-prod-333917886778"
 
   tags = {
     Name        = "${var.project_name}-terraform-state-prod"

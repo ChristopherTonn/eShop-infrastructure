@@ -2,19 +2,10 @@
 # Global Terraform Variables for eShop Infrastructure
 # ============================================================================
 
-variable "project_name" {
-  description = "Name of the project"
+variable "aws_profile" {
+  description = "AWS CLI profile to use (for IAM User support)"
   type        = string
-  default     = "eshop"
-}
-
-variable "environment" {
-  description = "Environment name (dev, staging, prod)"
-  type        = string
-  validation {
-    condition = contains(["dev", "staging", "prod"], var.environment)
-    error_message = "Environment must be one of: dev, staging, prod."
-  }
+  default     = "eshop-terraform"
 }
 
 variable "aws_region" {
