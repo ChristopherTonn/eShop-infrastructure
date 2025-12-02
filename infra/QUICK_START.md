@@ -4,7 +4,7 @@
 
 ### 1. AWS Console: IAM User erstellen
 
-```
+```text
 AWS Console → IAM → Users → Create User
 ├─ Name: eshop-terraform-user
 ├─ ✅ Programmatic access

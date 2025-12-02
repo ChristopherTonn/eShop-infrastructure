@@ -4,6 +4,7 @@
 # Variable values for Dev environment deployment
 
 # AWS & Project Configuration
+aws_profile  = "eshop-terraform"
 aws_region   = "eu-central-1"
 project_name = "eshop"
 
@@ -22,7 +23,7 @@ common_tags = {
 availability_zones = ["eu-central-1a", "eu-central-1b"]
 
 # EKS Cluster Configuration - OPTIMIZED FOR TESTING
-eks_cluster_version     = "1.28"
+eks_cluster_version     = "1.29"
 eks_node_instance_types = ["t3.medium"]
 eks_min_size            = 1
 eks_max_size            = 2  # Reduced for test
@@ -32,7 +33,7 @@ eks_desired_size        = 1  # Single node for test (saves ~$0.05/h)
 vpc_enable_vpc_flow_logs = false # Disabled for dev to save costs
 
 # RDS Configuration - OPTIMIZED FOR TESTING
-rds_engine_version                        = "15.3"
+rds_engine_version                        = "15.10"
 rds_master_username                       = "postgres"
 rds_master_password                       = "DevPassword123!@#" # Change this to strong password in production
 rds_backup_retention_period               = 1  # Minimal: 1 day only (saves ~$2/day)
@@ -79,7 +80,12 @@ rabbitmq_resources = {
 }
 
 # Skip K8s CSI Driver for now (depends on K8s Provider)
-k8s_csi_driver_enabled = false# Feature Flags - OPTIMIZED FOR TESTING (cost reduction)
+k8s_csi_driver_enabled = false
+
+# EKS SSH Key for Node Access
+eks_node_ssh_key = "eshop-dev-key"
+
+# Feature Flags - OPTIMIZED FOR TESTING (cost reduction)
 enable_monitoring = false # Disabled for test
 enable_backup     = false # Disabled for test
 enable_multi_az   = false # Single AZ for test

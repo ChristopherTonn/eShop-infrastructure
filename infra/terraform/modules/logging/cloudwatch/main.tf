@@ -125,8 +125,3 @@ resource "aws_iam_role_policy" "fluent_bit_kms" {
   })
 }
 
-# Output role ARN for annotation in Fluent Bit ServiceAccount
-output "fluent_bit_role_arn" {
-  description = "IAM role ARN for Fluent Bit IRSA"
-  value       = var.create_fluent_bit_role ? aws_iam_role.fluent_bit[0].arn : null
-}

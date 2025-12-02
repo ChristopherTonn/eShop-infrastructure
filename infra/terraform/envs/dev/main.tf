@@ -38,7 +38,8 @@ terraform {
 # ============================================================================
 
 provider "aws" {
-  region = var.aws_region
+  profile = var.aws_profile
+  region  = var.aws_region
 
   default_tags {
     tags = merge(var.common_tags, {
@@ -49,19 +50,13 @@ provider "aws" {
 }
 
 provider "kubernetes" {
-  # Phase 1: Use try() to handle missing EKS resources gracefully
-  host                   = try(module.eks.cluster_endpoint, "")
-  cluster_ca_certificate = try(base64decode(module.eks.cluster_certificate_authority_data), "")
-  token                  = try(data.aws_eks_cluster_auth.cluster.token, "")
+  # Phase 1: Provider will be configured after EKS is ready
+  # Temporary empty config to avoid provider initialization errors
 }
 
 provider "helm" {
-  kubernetes {
-    # Phase 1: Use try() to handle missing EKS resources gracefully
-    host                   = try(module.eks.cluster_endpoint, "")
-    cluster_ca_certificate = try(base64decode(module.eks.cluster_certificate_authority_data), "")
-    token                  = try(data.aws_eks_cluster_auth.cluster.token, "")
-  }
+  # Phase 1: Provider will be configured after EKS is ready
+  # Temporary empty config to avoid provider initialization errors
 }
 
 # Get cluster auth token
@@ -81,10 +76,10 @@ locals {
   vpc_cidr = "10.0.0.0/16"
 
   # Smaller instances for dev
-  eks_node_instance_types = ["t3.medium"]
-  eks_desired_size        = 2
-  eks_min_size            = 1
-  eks_max_size            = 5
+  eks_node_instance_types = var.eks_node_instance_types != null ? var.eks_node_instance_types : ["t3.medium"]
+  eks_desired_size        = var.eks_desired_size != null ? var.eks_desired_size : 1
+  eks_min_size            = var.eks_min_size != null ? var.eks_min_size : 1
+  eks_max_size            = var.eks_max_size != null ? var.eks_max_size : 2
 
   rds_instance_class    = "db.t3.micro"
   rds_allocated_storage = 20
@@ -155,6 +150,7 @@ module "eks" {
   min_size            = local.eks_min_size
   max_size            = local.eks_max_size
   desired_size        = local.eks_desired_size
+  ssh_key_name        = var.eks_node_ssh_key
 
   tags = merge(var.common_tags, {
     Environment = "development"

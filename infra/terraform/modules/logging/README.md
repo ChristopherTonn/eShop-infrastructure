@@ -465,7 +465,7 @@ fluent_bit_buffer_size = "64m"
 
 Use fields and filtering for faster queries:
 
-```
+```sql
 fields @timestamp, @message, kubernetes.pod_name
 | filter kubernetes.namespace_name = 'default'
 | filter @message like /ERROR/

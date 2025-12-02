@@ -3,8 +3,46 @@
 # eShop Infrastructure Destruction Script
 # Removes Kubernetes resources, local state, and optionally AWS infrastructure
 # Works even if infrastructure was never created (clean cleanup)
+#
+# Usage: ./destroy.sh [OPTIONS]
+# Options:
+#   --profile PROFILE    AWS CLI Profile (default: eshop-terraform)
+#   --region REGION      AWS Region (default: eu-central-1)
+#   --help              Show this help message
 
 set -e
+
+# Parse command line arguments
+AWS_PROFILE="${AWS_PROFILE:-eshop-terraform}"
+AWS_REGION="${AWS_REGION:-eu-central-1}"
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --profile)
+            AWS_PROFILE="$2"
+            shift 2
+            ;;
+        --region)
+            AWS_REGION="$2"
+            shift 2
+            ;;
+        --help)
+            echo "Usage: $0 [OPTIONS]"
+            echo "Options:"
+            echo "  --profile PROFILE    AWS CLI Profile (default: eshop-terraform)"
+            echo "  --region REGION      AWS Region (default: eu-central-1)"
+            echo "  --help              Show this help message"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+# Export profile for all AWS CLI calls
+export AWS_PROFILE
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -18,7 +56,6 @@ echo ""
 
 # Configuration
 CLUSTER_NAME="${EKS_CLUSTER_NAME:-eshop-dev-eks}"
-AWS_REGION="${AWS_REGION:-eu-central-1}"
 NAMESPACES=("default" "monitoring" "rabbitmq" "logging" "kube-system")
 
 # 1. Verify AWS credentials
@@ -28,7 +65,7 @@ if ! command -v aws &> /dev/null; then
     exit 1
 fi
 
-if ! aws sts get-caller-identity &> /dev/null; then
+if ! aws sts get-caller-identity --region $AWS_REGION &> /dev/null; then
     echo -e "${RED}  ❌ AWS credentials not configured. Please run 'aws configure'.${NC}"
     exit 1
 fi
@@ -36,9 +73,11 @@ fi
 echo "  ✅ AWS credentials validated"
 AWS_ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
 echo "  ✅ AWS Account: $AWS_ACCOUNT"
+echo "  ✅ AWS Profile: $AWS_PROFILE"
+echo "  ✅ AWS Region: $AWS_REGION"
 
 # 2. Check if EKS Cluster exists
-echo -e "${YELLOW}�� Step 2: Check EKS Cluster Status${NC}"
+echo -e "${YELLOW}📋 Step 2: Check EKS Cluster Status${NC}"
 CLUSTER_EXISTS=false
 if aws eks describe-cluster --name $CLUSTER_NAME --region $AWS_REGION &>/dev/null 2>&1; then
     CLUSTER_EXISTS=true
@@ -130,20 +169,26 @@ fi
 echo -e "${YELLOW}📋 Step 5: AWS Infrastructure Cleanup${NC}"
 echo ""
 
+# AWS-Ressourcen werden jetzt immer gelöscht
+CLEANUP_AWS=true
 if [[ "${CLEANUP_AWS:-false}" == "true" ]]; then
     echo -e "${RED}⚠️  AWS CLEANUP ENABLED - Deleting AWS Resources${NC}"
     echo ""
     
-    # 5.1 Delete ECR Repositories
-    echo "  Step 5.1: Clean up ECR Repositories..."
-    aws ecr describe-repositories --region $AWS_REGION --output json 2>/dev/null | \
-    jq -r '.repositories[] | select(.repositoryName | contains("eshop")) | .repositoryName' | while read -r repo; do
-        if [[ -n "$repo" ]]; then
-            echo "    • Deleting ECR repo: $repo"
-            aws ecr delete-repository --repository-name "$repo" --force --region $AWS_REGION 2>/dev/null || true
+        # 5.1 Delete ALL ECR Repositories
+        echo "  Step 5.1: Clean up ALL ECR Repositories..."
+        ALL_ECR_REPOS=$(aws ecr describe-repositories --region $AWS_REGION --query "repositories[].repositoryName" --output text)
+        if [ -z "$ALL_ECR_REPOS" ]; then
+            echo "    No ECR repositories found."
+        else
+            echo "    Deleting the following ECR repositories:"
+            echo "$ALL_ECR_REPOS"
+            for repo in $ALL_ECR_REPOS; do
+                echo "      Deleting ECR repo: $repo"
+                timeout 60s aws ecr delete-repository --repository-name "$repo" --force --region $AWS_REGION 2>/dev/null || true
+            done
+            echo "    All ECR repositories deleted."
         fi
-    done
-    echo "  ✅ ECR repositories handled"
     
     # 5.2 Delete LoadBalancers
     echo "  Step 5.2: Clean up LoadBalancers..."
@@ -185,21 +230,106 @@ if [[ "${CLEANUP_AWS:-false}" == "true" ]]; then
         aws eks delete-cluster --name $CLUSTER_NAME --region $AWS_REGION 2>/dev/null || true
     fi
     
-    # 5.6 Clean up Remote State (S3 + DynamoDB)
-    echo "  Step 5.6: Clean up Remote Terraform State..."
-    BUCKET_NAME="eshop-terraform-state-dev-$AWS_ACCOUNT"
-    TABLE_NAME="eshop-terraform-lock-dev"
-    LOCK_ID="eshop-terraform-state-dev-$AWS_ACCOUNT/dev/terraform.tfstate"
-    
-    echo "    • Cleaning S3 bucket: $BUCKET_NAME"
-    if aws s3api head-bucket --bucket "$BUCKET_NAME" 2>/dev/null; then
-        aws s3 rm "s3://$BUCKET_NAME" --recursive --region $AWS_REGION 2>/dev/null || true
-    fi
-    
-    echo "    • Cleaning DynamoDB table: $TABLE_NAME"
-    aws dynamodb delete-item --table-name "$TABLE_NAME" --key "{\"LockID\":{\"S\":\"$LOCK_ID\"}}" --region $AWS_REGION 2>/dev/null || true
-    
-    echo "  ✅ Remote state cleaned"
+
+        # 5.6 Clean up Remote State (S3 + DynamoDB)
+        echo "  Step 5.6: Clean up Remote Terraform State..."
+        BUCKET_NAME="eshop-terraform-state-dev-$AWS_ACCOUNT"
+        TABLE_NAME="eshop-terraform-lock-dev"
+        LOCK_ID="eshop-terraform-state-dev-$AWS_ACCOUNT/dev/terraform.tfstate"
+
+        echo "    • Cleaning S3 bucket: $BUCKET_NAME"
+        if aws s3api head-bucket --bucket "$BUCKET_NAME" 2>/dev/null; then
+                aws s3 rm "s3://$BUCKET_NAME" --recursive --region $AWS_REGION 2>/dev/null || true
+        fi
+
+        echo "    • Cleaning DynamoDB table: $TABLE_NAME"
+        aws dynamodb delete-item --table-name "$TABLE_NAME" --key "{\"LockID\":{\"S\":\"$LOCK_ID\"}}" --region $AWS_REGION 2>/dev/null || true
+
+        # --- Delete ALL Elastic IPs ---
+        echo "  Step 5.7: Release ALL Elastic IPs (EIPs)..."
+        ALL_EIPS=$(aws ec2 describe-addresses --query "Addresses[].AllocationId" --output text)
+        if [ -z "$ALL_EIPS" ]; then
+            echo "    No Elastic IPs found."
+        else
+            echo "    Releasing the following EIPs:"
+            echo "$ALL_EIPS"
+            for eip in $ALL_EIPS; do
+                echo "      Releasing: $eip"
+                timeout 60s aws ec2 release-address --allocation-id "$eip" --region $AWS_REGION || true
+            done
+            echo "    All Elastic IPs released."
+        fi
+
+        # --- Delete ALL DynamoDB tables with 'eshop' ---
+        echo "  Step 5.8: Delete ALL DynamoDB tables with 'eshop' in name..."
+        DYNAMO_TABLES=$(aws dynamodb list-tables --region $AWS_REGION --output text | grep eshop | grep -v TABLENAMES)
+        if [ -z "$DYNAMO_TABLES" ]; then
+            echo "    No DynamoDB tables with 'eshop' found."
+        else
+            echo "    Deleting the following tables:"
+            echo "$DYNAMO_TABLES"
+            for t in $DYNAMO_TABLES; do
+                echo "      Deleting: $t"
+                timeout 60s aws dynamodb delete-table --table-name "$t" --region $AWS_REGION || true
+            done
+            echo "    All DynamoDB tables deleted."
+        fi
+
+        echo "  ✅ Remote state, EIPs, and DynamoDB tables cleaned"
+
+        # --- Delete ALL VPCs with 'eshop' in name ---
+        echo "  Step 5.9: Delete ALL VPCs with 'eshop' in name and dependencies..."
+        VPCS=$(aws ec2 describe-vpcs --region $AWS_REGION --query "Vpcs[?contains(Tags[?Key=='Name'].Value | [0], 'eshop')].VpcId" --output text)
+        if [ -z "$VPCS" ]; then
+            echo "    No VPCs with 'eshop' in name found."
+        else
+            echo "    Deleting the following VPCs and dependencies:"
+            echo "$VPCS"
+            for vpc in $VPCS; do
+                echo "      Processing VPC: $vpc"
+                # 1. Delete NAT Gateways
+                NAT_GWS=$(aws ec2 describe-nat-gateways --region $AWS_REGION --filter "Name=vpc-id,Values=$vpc" --query "NatGateways[].NatGatewayId" --output text)
+                for nat in $NAT_GWS; do
+                    echo "        Deleting NAT Gateway: $nat"
+                    timeout 60s aws ec2 delete-nat-gateway --nat-gateway-id "$nat" --region $AWS_REGION || echo "        ⚠️ Fehler beim Löschen von NAT Gateway $nat"
+                done
+                # 2. Delete Subnets
+                SUBNETS=$(aws ec2 describe-subnets --region $AWS_REGION --filters "Name=vpc-id,Values=$vpc" --query "Subnets[].SubnetId" --output text)
+                for subnet in $SUBNETS; do
+                    echo "        Deleting Subnet: $subnet"
+                    timeout 60s aws ec2 delete-subnet --subnet-id "$subnet" --region $AWS_REGION || echo "        ⚠️ Fehler beim Löschen von Subnet $subnet"
+                done
+                # 3. Delete Route Tables
+                RTBS=$(aws ec2 describe-route-tables --region $AWS_REGION --filters "Name=vpc-id,Values=$vpc" --query "RouteTables[].RouteTableId" --output text)
+                for rtb in $RTBS; do
+                    # Skip main route table association removal
+                    ASSOCIATIONS=$(aws ec2 describe-route-tables --region $AWS_REGION --route-table-ids "$rtb" --query "RouteTables[].Associations[].RouteTableAssociationId" --output text)
+                    for assoc in $ASSOCIATIONS; do
+                        echo "        Disassociating Route Table: $rtb Association: $assoc"
+                        timeout 30s aws ec2 disassociate-route-table --association-id "$assoc" --region $AWS_REGION || true
+                    done
+                    echo "        Deleting Route Table: $rtb"
+                    timeout 60s aws ec2 delete-route-table --route-table-id "$rtb" --region $AWS_REGION || echo "        ⚠️ Fehler beim Löschen von Route Table $rtb"
+                done
+                # 4. Delete Internet Gateways
+                IGWS=$(aws ec2 describe-internet-gateways --region $AWS_REGION --filters "Name=attachment.vpc-id,Values=$vpc" --query "InternetGateways[].InternetGatewayId" --output text)
+                for igw in $IGWS; do
+                    echo "        Detaching and Deleting Internet Gateway: $igw"
+                    timeout 30s aws ec2 detach-internet-gateway --internet-gateway-id "$igw" --vpc-id "$vpc" --region $AWS_REGION || true
+                    timeout 60s aws ec2 delete-internet-gateway --internet-gateway-id "$igw" --region $AWS_REGION || echo "        ⚠️ Fehler beim Löschen von Internet Gateway $igw"
+                done
+                # 5. Delete Security Groups (außer default)
+                SGS=$(aws ec2 describe-security-groups --region $AWS_REGION --filters "Name=vpc-id,Values=$vpc" --query "SecurityGroups[?GroupName!='default'].GroupId" --output text)
+                for sg in $SGS; do
+                    echo "        Deleting Security Group: $sg"
+                    timeout 60s aws ec2 delete-security-group --group-id "$sg" --region $AWS_REGION || echo "        ⚠️ Fehler beim Löschen von Security Group $sg"
+                done
+                # 6. Delete VPC
+                echo "        Deleting VPC: $vpc"
+                timeout 60s aws ec2 delete-vpc --vpc-id "$vpc" --region $AWS_REGION && echo "        ✅ VPC $vpc deleted" || echo "        ⚠️ Fehler beim Löschen von VPC $vpc"
+            done
+            echo "    All VPCs and dependencies deleted."
+        fi
     
     echo ""
     echo -e "${YELLOW}⏳ AWS Cleanup Status:${NC}"
@@ -219,6 +349,26 @@ else
 fi
 
 # 6. Summary
+
+# --- Vollständige Löschung aller Ressourcen (Terraform) ---
+echo -e "${YELLOW}📋 Step 7: Destroy Terraform Bootstrap (S3 Bucket & DynamoDB Table)${NC}"
+if [[ -d "terraform/bootstrap" ]]; then
+    cd terraform/bootstrap
+    echo "  🧨 Destroying bootstrap resources (S3 Bucket, DynamoDB Table)..."
+    terraform destroy -auto-approve || true
+    cd ../../..
+    echo "  ✅ Bootstrap resources destroyed"
+fi
+
+echo -e "${YELLOW}📋 Step 8: Destroy Terraform Infrastructure (VPC, Subnets, etc.)${NC}"
+if [[ -d "terraform/envs/dev" ]]; then
+    cd terraform/envs/dev
+    echo "  🧨 Destroying infrastructure resources (VPC, Subnets, etc.)..."
+    terraform destroy -auto-approve || true
+    cd ../../..
+    echo "  ✅ Infrastructure resources destroyed"
+fi
+
 echo ""
 echo -e "${GREEN}🎉 ===============================================${NC}"
 echo -e "${GREEN}✅ Cleanup Complete!${NC}"
@@ -226,22 +376,16 @@ echo -e "${GREEN}===============================================${NC}"
 echo ""
 echo -e "${GREEN}✅ Cleanup Summary:${NC}"
 echo "  ✓ Local Terraform state files removed"
-
-if [[ "$CLUSTER_EXISTS" == "true" ]]; then
-    echo "  ✓ Kubernetes resources deleted"
-    echo "  ✓ Helm releases uninstalled"
-    echo "  ✓ Services and PVCs removed"
-fi
-
-if [[ "${CLEANUP_AWS:-false}" == "true" ]]; then
-    echo "  ✓ ECR repositories deleted"
-    echo "  ✓ RDS databases deleted"
-    echo "  ✓ ElastiCache clusters deleted"
-    if [[ "$CLUSTER_EXISTS" == "true" ]]; then
-        echo "  ✓ EKS cluster deletion initiated"
-    fi
-    echo "  ✓ Remote state (S3 + DynamoDB) cleaned"
-fi
+echo "  ✓ Kubernetes resources deleted (falls vorhanden)"
+echo "  ✓ Helm releases uninstalled (falls vorhanden)"
+echo "  ✓ Services und PVCs entfernt (falls vorhanden)"
+echo "  ✓ ECR repositories deleted"
+echo "  ✓ RDS databases deleted"
+echo "  ✓ ElastiCache clusters deleted"
+echo "  ✓ EKS cluster deletion initiated (falls vorhanden)"
+echo "  ✓ Remote state (S3 + DynamoDB) cleaned"
+echo "  ✓ S3 Bucket & DynamoDB Table gelöscht"
+echo "  ✓ VPC & Subnets gelöscht"
 
 echo ""
 echo -e "${YELLOW}📝 Next Steps:${NC}"
@@ -249,4 +393,8 @@ echo "  • To redeploy: ./deploy.sh"
 echo "  • To check AWS cleanup status:"
 echo "    aws eks list-clusters --region eu-central-1"
 echo "    aws rds describe-db-instances --region eu-central-1"
+echo "    aws ec2 describe-vpcs --region eu-central-1"
+echo "    aws s3 ls | grep eshop-terraform-state"
+echo "    aws dynamodb list-tables --region eu-central-1"
 echo ""
+echo -e "${YELLOW}💡 Alle Ressourcen wurden entfernt. Es entstehen keine weiteren AWS-Kosten!${NC}"

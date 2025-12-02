@@ -232,7 +232,7 @@ terraform {
 
 ### 6.1 CI/CD Pipeline
 
-```
+```text
 1. Git Push (develop/staging/main)
    ↓
 2. GitHub Actions Trigger (CI Workflow)
@@ -255,7 +255,7 @@ terraform {
 
 ### 6.2 Secret Resolution in K8s
 
-```
+```text
 Pod Start
 ↓
 K8s reads SecretProviderClass

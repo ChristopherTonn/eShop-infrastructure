@@ -48,21 +48,14 @@ resource "kubernetes_service_account" "fluent_bit" {
   }
 }
 
-# Add Fluent Helm repository
-resource "helm_repository" "fluent" {
-  name  = "fluent"
-  url   = var.fluent_bit_repository
-  force = true
-}
-
 # Deploy Fluent Bit via Helm
 resource "helm_release" "fluent_bit" {
-  count       = var.fluent_bit_enabled ? 1 : 0
-  name        = "fluent-bit"
-  repository  = helm_repository.fluent.name
-  chart       = "fluent-bit"
-  version     = var.fluent_bit_chart_version
-  namespace   = kubernetes_namespace.logging.metadata[0].name
+  count      = var.fluent_bit_enabled ? 1 : 0
+  name       = "fluent-bit"
+  repository = var.fluent_bit_repository
+  chart      = "fluent-bit"
+  version    = var.fluent_bit_chart_version
+  namespace  = kubernetes_namespace.logging.metadata[0].name
   max_history = 10
 
   values = [
