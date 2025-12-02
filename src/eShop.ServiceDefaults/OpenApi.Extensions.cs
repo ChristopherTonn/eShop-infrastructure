@@ -63,11 +63,7 @@ public static partial class Extensions
             {
                 builder.Services.AddOpenApi(description, options =>
                 {
-                    options.ApplyApiVersionInfo(openApi.GetRequiredValue("Document:Title"), openApi.GetRequiredValue("Document:Description"));
-                    options.ApplyAuthorizationChecks([.. scopes.Keys]);
                     options.ApplySecuritySchemeDefinitions();
-                    options.ApplyOperationDeprecatedStatus();
-                    options.ApplyApiVersionDescription();
                 });
             }
         }
