@@ -491,3 +491,12 @@ $RECYCLE.BIN/
 /playwright/.auth/
 /user.json
 .azure
+
+# Infrastructure Scripts (local helpers - not tracked in Git)
+infra/scripts-local/
+
+# Terraform files and state
+infra/terraform/**/.terraform/
+infra/terraform/**/.terraform.lock.hcl
+infra/terraform/**/terraform.tfstate*
+infra/terraform/**/tfplan
