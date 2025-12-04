@@ -188,14 +188,14 @@ if [ "$SKIP_BUILD" = false ]; then
     log_info "Building AppHost project..."
     cd "$PROJECT_ROOT/codebase"
     
-    if [ -f "codebase/eShop.slnx" ]; then
+    if [ -f "eShop.slnx" ]; then
         log_info "Using dotnet publish with eShop.slnx..."
         # This would build and publish images
         # Implementation depends on AppHost configuration
         log_warning "AppHost build automation not yet configured in this script"
         log_info "Manual step: Run Aspire deployment or 'dotnet run' in eShop.AppHost"
     else
-        log_error "eShop.slnx not found at $PROJECT_ROOT"
+        log_error "eShop.slnx not found at $PROJECT_ROOT/codebase"
     fi
 else
     log_section "Step 4: Skipping Build"
