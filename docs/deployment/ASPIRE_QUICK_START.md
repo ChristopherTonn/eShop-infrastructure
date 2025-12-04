@@ -6,14 +6,15 @@ Fast local development setup for eShop microservices using .NET Aspire orchestra
 
 ## 📋 Prerequisites
 
-| Tool | Version | Check |
-|------|---------|-------|
-| .NET SDK | 9.0+ | `dotnet --version` |
-| Docker Desktop | 20.0+ | `docker --version` |
-| Visual Studio Code | Latest | `code --version` |
-| Git | 2.0+ | `git --version` |
+| Tool               | Version | Check              |
+| ------------------ | ------- | ------------------ |
+| .NET SDK           | 9.0+    | `dotnet --version` |
+| Docker Desktop     | 20.0+   | `docker --version` |
+| Visual Studio Code | Latest  | `code --version`   |
+| Git                | 2.0+    | `git --version`    |
 
 Optional but recommended:
+
 - **Aspire Dashboard**: Built-in to .NET 9
 - **Docker Compose**: For container orchestration (included in Docker Desktop)
 
@@ -263,6 +264,7 @@ Connection refused: postgres:5432
 ```
 
 Solutions:
+
 ```bash
 # 1. Ensure postgres service is running in Aspire
 # 2. Check connection string in appsettings.Development.json

@@ -6,12 +6,12 @@ Deploy eShop to Amazon EKS with Helm, Terraform, and GitHub Actions.
 
 ## 📋 Prerequisites
 
-| Component | Details |
-|-----------|---------|
-| **AWS Account** | Access to eu-central-1 region |
-| **IAM Permissions** | EKS, VPC, RDS, ElastiCache, ECR, IAM |
-| **Tools** | `terraform`, `kubectl`, `aws-cli`, `helm`, `docker` |
-| **Git** | Cloned eShop repository |
+| Component           | Details                                             |
+| ------------------- | --------------------------------------------------- |
+| **AWS Account**     | Access to eu-central-1 region                       |
+| **IAM Permissions** | EKS, VPC, RDS, ElastiCache, ECR, IAM                |
+| **Tools**           | `terraform`, `kubectl`, `aws-cli`, `helm`, `docker` |
+| **Git**             | Cloned eShop repository                             |
 
 ---
 

@@ -27,6 +27,7 @@ The RDS module creates a managed PostgreSQL database with multi-AZ deployment, a
 ### Input Variables
 
 See `variables.tf` for:
+
 - `identifier` - Database instance name
 - `engine_version` - PostgreSQL version (e.g., "15.4")
 - `instance_class` - Instance type (e.g., db.t3.micro)
@@ -38,6 +39,7 @@ See `variables.tf` for:
 ### Output Values
 
 See `outputs.tf` for:
+
 - `endpoint` - RDS connection endpoint
 - `port` - Database port (5432)
 - `database_name` - Database identifier

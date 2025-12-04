@@ -8,12 +8,12 @@ Welcome to the eShop Reference Application documentation. This guide helps you n
 
 Building and running eShop locally for development.
 
-| Guide | Purpose |
-|-------|---------|
-| [Getting Started](GETTING_STARTED.md) | First steps - setup your environment |
+| Guide                                                      | Purpose                               |
+| ---------------------------------------------------------- | ------------------------------------- |
+| [Getting Started](GETTING_STARTED.md)                      | First steps - setup your environment  |
 | [Local Development Setup](deployment/LOCAL_DEVELOPMENT.md) | Development environment configuration |
-| [ASPIRE Quick Start](deployment/ASPIRE_QUICK_START.md) | Running services via .NET Aspire |
-| [Troubleshooting](deployment/TROUBLESHOOTING.md) | Common issues and solutions |
+| [ASPIRE Quick Start](deployment/ASPIRE_QUICK_START.md)     | Running services via .NET Aspire      |
+| [Troubleshooting](deployment/TROUBLESHOOTING.md)           | Common issues and solutions           |
 
 ---
 
@@ -21,13 +21,13 @@ Building and running eShop locally for development.
 
 Building and maintaining cloud infrastructure.
 
-| Guide | Purpose |
-|-------|---------|
-| [Infrastructure Overview](infrastructure/README.md) | High-level infrastructure design |
-| [AWS Setup & Configuration](infrastructure/AWS_SETUP.md) | AWS account and IAM setup |
-| [Terraform Setup Guide](infrastructure/TERRAFORM_GUIDE.md) | Infrastructure-as-Code with Terraform |
-| [Kubernetes Deployment](deployment/KUBERNETES_DEPLOYMENT.md) | Deploying to EKS |
-| [Environment & Secrets](deployment/ENVIRONMENTS_AND_SECRETS.md) | Managing secrets and configurations |
+| Guide                                                           | Purpose                               |
+| --------------------------------------------------------------- | ------------------------------------- |
+| [Infrastructure Overview](infrastructure/README.md)             | High-level infrastructure design      |
+| [AWS Setup & Configuration](infrastructure/AWS_SETUP.md)        | AWS account and IAM setup             |
+| [Terraform Setup Guide](infrastructure/TERRAFORM_GUIDE.md)      | Infrastructure-as-Code with Terraform |
+| [Kubernetes Deployment](deployment/KUBERNETES_DEPLOYMENT.md)    | Deploying to EKS                      |
+| [Environment & Secrets](deployment/ENVIRONMENTS_AND_SECRETS.md) | Managing secrets and configurations   |
 
 ### Module Documentation
 
@@ -46,13 +46,13 @@ Building and maintaining cloud infrastructure.
 
 Operating, monitoring, and maintaining production systems.
 
-| Guide | Purpose |
-|-------|---------|
-| [Runbooks Index](runbooks/) | Operational procedures |
-| [Disaster Recovery](runbooks/DISASTER_RECOVERY.md) | Backup and recovery procedures |
+| Guide                                                  | Purpose                          |
+| ------------------------------------------------------ | -------------------------------- |
+| [Runbooks Index](runbooks/)                            | Operational procedures           |
+| [Disaster Recovery](runbooks/DISASTER_RECOVERY.md)     | Backup and recovery procedures   |
 | [Monitoring & Alerting](runbooks/MONITORING_ALERTS.md) | Health checks and alerting setup |
-| [Scaling Guide](runbooks/SCALING.md) | Horizontal & vertical scaling |
-| [Backups & Retention](runbooks/BACKUPS.md) | Data backup strategies |
+| [Scaling Guide](runbooks/SCALING.md)                   | Horizontal & vertical scaling    |
+| [Backups & Retention](runbooks/BACKUPS.md)             | Data backup strategies           |
 
 ---
 
@@ -60,11 +60,11 @@ Operating, monitoring, and maintaining production systems.
 
 Understanding how eShop is designed.
 
-| Document | Content |
-|----------|---------|
-| [System Architecture](ARCHITECTURE.md) | Components, data flows, design decisions |
-| 📄 [Technical Objectives](pdf/Technical%20Objective%20Paper.pdf) | Project goals and success criteria (PDF) |
-| 📄 [Architecture Diagrams](pdf/System%20Architecture%20Diagram.pdf) | Visual system design (PDF) |
+| Document                                                            | Content                                  |
+| ------------------------------------------------------------------- | ---------------------------------------- |
+| [System Architecture](ARCHITECTURE.md)                              | Components, data flows, design decisions |
+| 📄 [Technical Objectives](pdf/Technical%20Objective%20Paper.pdf)    | Project goals and success criteria (PDF) |
+| 📄 [Architecture Diagrams](pdf/System%20Architecture%20Diagram.pdf) | Visual system design (PDF)               |
 
 ---
 
@@ -72,10 +72,10 @@ Understanding how eShop is designed.
 
 Automated testing, building, and deployment.
 
-| Guide | Purpose |
-|-------|---------|
-| [CI/CD & Automation](CI-CD.md) | Pipelines, workflows, deployment |
-| [GitHub Workflows](../.github/workflows/README.md) | Detailed workflow documentation |
+| Guide                                              | Purpose                          |
+| -------------------------------------------------- | -------------------------------- |
+| [CI/CD & Automation](CI-CD.md)                     | Pipelines, workflows, deployment |
+| [GitHub Workflows](../.github/workflows/README.md) | Detailed workflow documentation  |
 
 ---
 

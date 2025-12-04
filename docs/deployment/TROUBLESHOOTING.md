@@ -52,6 +52,7 @@ dotnet --version
 ```
 
 **Code Fix:**
+
 ```csharp
 // ❌ Wrong (NET 10+ only)
 options.AddOperationTransformer((operation, context, cancellationToken) => {

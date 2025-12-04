@@ -20,11 +20,11 @@ Backup strategies, retention policies, and restore procedures.
 
 ### Three-Layer Backup Approach
 
-| Layer | What | Frequency | Retention | RTO |
-|-------|------|-----------|-----------|-----|
-| **Database** | PostgreSQL data | Daily | 30 days | 1 hour |
-| **Snapshots** | Point-in-time | Manual | 90 days | 30 min |
-| **Configuration** | Terraform state, K8s manifests | Continuous | 7 days | 10 min |
+| Layer             | What                           | Frequency  | Retention | RTO    |
+| ----------------- | ------------------------------ | ---------- | --------- | ------ |
+| **Database**      | PostgreSQL data                | Daily      | 30 days   | 1 hour |
+| **Snapshots**     | Point-in-time                  | Manual     | 90 days   | 30 min |
+| **Configuration** | Terraform state, K8s manifests | Continuous | 7 days    | 10 min |
 
 ---
 
@@ -120,13 +120,13 @@ mv *.tfstate.gpg /secure/backup/location/
 
 ### Data Retention
 
-| Backup Type | Age | Action |
-|-------------|-----|--------|
-| RDS Automatic | > 7 days | Auto-delete |
-| RDS Manual | > 90 days | Auto-delete |
-| Snapshots | > 30 days | Alert for review |
+| Backup Type   | Age        | Action                  |
+| ------------- | ---------- | ----------------------- |
+| RDS Automatic | > 7 days   | Auto-delete             |
+| RDS Manual    | > 90 days  | Auto-delete             |
+| Snapshots     | > 30 days  | Alert for review        |
 | K8s Manifests | > 6 months | Archive to cold storage |
-| Logs | > 30 days | Archive to S3 Glacier |
+| Logs          | > 30 days  | Archive to S3 Glacier   |
 
 ### Implement Retention
 

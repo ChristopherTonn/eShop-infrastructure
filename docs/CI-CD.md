@@ -15,6 +15,7 @@ Complete overview of continuous integration and continuous deployment pipelines 
 ## 🔄 Pipeline Overview
 
 eShop uses **GitHub Actions** for automated:
+
 1. **Build & Test** - Compile, unit tests, security scanning
 2. **Container Build** - Docker images, push to ECR
 3. **Kubernetes Deploy** - Helm charts to EKS
@@ -22,22 +23,22 @@ eShop uses **GitHub Actions** for automated:
 
 ### Workflow Files
 
-| File | Trigger | Purpose |
-|------|---------|---------|
-| `ci.yml` | Push/PR to feature/* | Build & test all services |
-| `cd.yml` | Merge to develop/main | Build images & deploy |
-| `client-app-tests.yml` | Changes to ClientApp | E2E tests (Playwright) |
-| `markdownlint.yml` | Changes to *.md | Documentation validation |
-| `playwright.yml` | Scheduled + manual | E2E tests in CI |
+| File                   | Trigger               | Purpose                   |
+| ---------------------- | --------------------- | ------------------------- |
+| `ci.yml`               | Push/PR to feature/\* | Build & test all services |
+| `cd.yml`               | Merge to develop/main | Build images & deploy     |
+| `client-app-tests.yml` | Changes to ClientApp  | E2E tests (Playwright)    |
+| `markdownlint.yml`     | Changes to \*.md      | Documentation validation  |
+| `playwright.yml`       | Scheduled + manual    | E2E tests in CI           |
 
 ### Branch Strategy
 
-| Branch | Environment | Deploy | Approval |
-|--------|-------------|--------|----------|
-| `develop` | Dev | ✅ Automatic | None |
-| `staging` | Staging | ✅ Automatic | None |
-| `main` | Production | ⏸️ Manual | Required |
-| `feature/*` | None | ✅ Build only | - |
+| Branch      | Environment | Deploy        | Approval |
+| ----------- | ----------- | ------------- | -------- |
+| `develop`   | Dev         | ✅ Automatic  | None     |
+| `staging`   | Staging     | ✅ Automatic  | None     |
+| `main`      | Production  | ⏸️ Manual     | Required |
+| `feature/*` | None        | ✅ Build only | -        |
 
 ---
 
@@ -99,7 +100,7 @@ eShop uses **GitHub OIDC** instead of long-lived AWS credentials:
 ✅ No credential rotation needed  
 ✅ Short-lived tokens (15 minutes)  
 ✅ Better security posture  
-✅ Audit trail in AWS CloudTrail  
+✅ Audit trail in AWS CloudTrail
 
 Setup: [AWS IAM OIDC Provider](infrastructure/AWS_SETUP.md#github-actions-oidc)
 
@@ -116,6 +117,7 @@ All Docker images are pushed to **Amazon ECR** (Elastic Container Registry):
 ```
 
 **Examples:**
+
 ```
 123456789.dkr.ecr.eu-central-1.amazonaws.com/basket-api:abc1234
 123456789.dkr.ecr.eu-central-1.amazonaws.com/catalog-api:def5678
@@ -124,6 +126,7 @@ All Docker images are pushed to **Amazon ECR** (Elastic Container Registry):
 ### Image Cleanup
 
 Old images are automatically cleaned up based on policy:
+
 - **Keep latest 10 images** per service
 - **Delete untagged images** older than 7 days
 
@@ -132,6 +135,7 @@ Old images are automatically cleaned up based on policy:
 ## 🚀 Deployment Process
 
 ### Step 1: Code Merge
+
 ```bash
 # Create feature branch
 git checkout -b feature/my-feature
@@ -142,6 +146,7 @@ git push origin feature/my-feature
 ```
 
 ### Step 2: Automatic Deployment (CD Workflow)
+
 ```
 1. Trigger: Code merged to develop
 2. Actions:
@@ -153,6 +158,7 @@ git push origin feature/my-feature
 ```
 
 ### Step 3: Verify Deployment
+
 ```bash
 # Check rollout status
 kubectl rollout status deployment/basket-api -n default
@@ -169,18 +175,21 @@ curl http://basket-api/health
 ## 🧪 Testing Strategy
 
 ### Unit Tests
+
 ```bash
 cd codebase
 dotnet test
 ```
 
 ### Integration Tests
+
 ```bash
 # Runs after deployment
 dotnet test --filter Category=Integration
 ```
 
 ### End-to-End Tests (E2E)
+
 ```bash
 # Playwright tests in CI
 cd codebase/e2e
@@ -188,6 +197,7 @@ npx playwright test
 ```
 
 **Test Results:**
+
 - Logs uploaded to GitHub Artifacts
 - Coverage reports in pull requests
 - Failures block deployment to main
@@ -221,6 +231,7 @@ kubectl port-forward -n monitoring svc/grafana 3000:80
 ```
 
 Monitor key metrics:
+
 - ✅ Pod restart count (should be 0)
 - ✅ Request latency (p99 < 200ms)
 - ✅ Error rate (< 0.1%)
@@ -274,6 +285,7 @@ kubectl rollout undo deployment/basket-api
 ### Build Fails
 
 **Check:**
+
 ```bash
 cd codebase
 dotnet build
@@ -281,6 +293,7 @@ dotnet test
 ```
 
 **Common causes:**
+
 - .NET version mismatch → Check `global.json`
 - Missing NuGet packages → Run `dotnet restore`
 - Failing tests → Check test logs in GitHub
@@ -288,6 +301,7 @@ dotnet test
 ### Deployment Fails
 
 **Check:**
+
 ```bash
 kubectl get pods -n default
 kubectl logs POD_NAME
@@ -295,6 +309,7 @@ kubectl describe pod POD_NAME
 ```
 
 **Common causes:**
+
 - Image not found in ECR → Check push logs
 - Secret not mounted → Check ENVIRONMENTS_AND_SECRETS.md
 - Resource limits exceeded → Check pod requests/limits
@@ -302,12 +317,14 @@ kubectl describe pod POD_NAME
 ### E2E Tests Fail
 
 **Check:**
+
 ```bash
 cd codebase/e2e
 npx playwright test --debug
 ```
 
 **Common causes:**
+
 - Page load timeout → Check service health
 - Element not found → Check page selectors
 - Network issues → Check security groups
@@ -318,13 +335,13 @@ npx playwright test --debug
 
 ### Build Time Targets
 
-| Stage | Target | Current |
-|-------|--------|---------|
-| Build | < 5 min | ~4 min |
-| Tests | < 5 min | ~3 min |
-| Push to ECR | < 2 min | ~1 min |
-| Helm Deploy | < 3 min | ~2 min |
-| **Total** | **< 15 min** | **~10 min** |
+| Stage       | Target       | Current     |
+| ----------- | ------------ | ----------- |
+| Build       | < 5 min      | ~4 min      |
+| Tests       | < 5 min      | ~3 min      |
+| Push to ECR | < 2 min      | ~1 min      |
+| Helm Deploy | < 3 min      | ~2 min      |
+| **Total**   | **< 15 min** | **~10 min** |
 
 ### Optimization Tips
 
@@ -338,6 +355,7 @@ npx playwright test --debug
 ## 🔒 Security Best Practices
 
 ✅ **Do:**
+
 - Use OIDC for AWS authentication
 - Rotate GitHub tokens regularly
 - Keep secrets in GitHub Secrets, not code
@@ -345,6 +363,7 @@ npx playwright test --debug
 - Sign commits with GPG (recommended)
 
 ❌ **Don't:**
+
 - Hardcode credentials in workflows
 - Commit .env files
 - Store passwords in git history

@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-processor
+  namespace: eshop
+  labels:
+    app: order-processor
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: order-processor
+  template:
+    metadata:
+      labels:
+        app: order-processor
+        version: v1
+    spec:
+      serviceAccountName: eshop-sa
+      containers:
+      - name: order-processor
+        image: CONTAINER_REGISTRY/order-processor:latest
+        imagePullPolicy: Always
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Production"
+        - name: ConnectionStrings__orderdb
+          valueFrom:
+            secretKeyRef:
+              name: eshop-secrets
+              key: postgres-order-connection
+        - name: ConnectionStrings__integrationeventlogdb
+          valueFrom:
+            secretKeyRef:
+              name: eshop-secrets
+              key: postgres-integrationeventlog-connection
+        - name: RabbitMqSettings__Host
+          valueFrom:
+            secretKeyRef:
+              name: eshop-secrets
+              key: rabbitmq-host
+        - name: RabbitMqSettings__UserName
+          valueFrom:
+            secretKeyRef:
+              name: eshop-secrets
+              key: rabbitmq-username
+        - name: RabbitMqSettings__Password
+          valueFrom:
+            secretKeyRef:
+              name: eshop-secrets
+              key: rabbitmq-password
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+      securityContext:
+        fsGroup: 1000
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - order-processor
+              topologyKey: kubernetes.io/hostname

@@ -8,12 +8,12 @@ Complete guide for setting up eShop development environment on your machine.
 
 ### Minimum Hardware
 
-| Resource | Requirement |
-|----------|-------------|
-| **CPU** | 4 cores (Intel/AMD) |
-| **RAM** | 8GB (16GB recommended) |
-| **Disk** | 20GB free space |
-| **OS** | Windows, macOS, or Linux |
+| Resource | Requirement              |
+| -------- | ------------------------ |
+| **CPU**  | 4 cores (Intel/AMD)      |
+| **RAM**  | 8GB (16GB recommended)   |
+| **Disk** | 20GB free space          |
+| **OS**   | Windows, macOS, or Linux |
 
 ### Software Prerequisites
 
@@ -96,15 +96,17 @@ http://localhost:8000
 ✅ Integrated dashboard (metrics, logs, debugging)  
 ✅ Automatic container management  
 ✅ Hot reload support  
-✅ Easy service configuration  
+✅ Easy service configuration
 
 **Setup:**
+
 ```bash
 cd codebase
 dotnet run --project src/eShop.AppHost
 ```
 
 **Access Dashboard:**
+
 ```
 http://localhost:15213
 ```
@@ -118,15 +120,17 @@ http://localhost:15213
 **Advantages:**
 ✅ Matches production architecture  
 ✅ Full containerization  
-✅ Easy to share with team  
+✅ Easy to share with team
 
 **Setup:**
+
 ```bash
 cd codebase
 docker-compose -f docker-compose.yml up -d
 ```
 
 **Check Services:**
+
 ```bash
 docker-compose ps
 ```
@@ -138,6 +142,7 @@ docker-compose ps
 **Best for:** Specific debugging scenarios
 
 **Setup:**
+
 ```bash
 cd codebase
 
@@ -331,6 +336,7 @@ npx playwright test --debug
 **Cause:** Another PostgreSQL instance is running
 
 **Solution:**
+
 ```bash
 # Find process using port 5432
 lsof -i :5432
@@ -349,6 +355,7 @@ brew services stop postgresql  # macOS
 **Cause:** Docker Desktop not started
 
 **Solution:**
+
 ```bash
 # macOS
 open /Applications/Docker.app
@@ -362,6 +369,7 @@ open /Applications/Docker.app
 **Cause:** Connection string incorrect or database not ready
 
 **Solution:**
+
 ```bash
 # Test connection
 psql -h localhost -U eshop -d catalogdb
@@ -378,6 +386,7 @@ psql -c "CREATE DATABASE catalogdb;" -U postgres
 **Cause:** Docker images/containers accumulating
 
 **Solution:**
+
 ```bash
 # Clean up Docker
 docker system prune -a --volumes

@@ -74,15 +74,15 @@ aws logs filter-log-events \
 
 ### Key Metrics to Monitor
 
-| Metric | Threshold | Alert |
-|--------|-----------|-------|
-| CPU Usage | > 80% | Warning |
-| Memory Usage | > 90% | Warning |
-| Disk Usage | > 85% | Warning |
-| Pod Restart Count | > 3 (5 min) | Critical |
-| Request Latency (p99) | > 500ms | Warning |
-| Error Rate | > 1% | Critical |
-| Service Availability | < 99.5% | Critical |
+| Metric                | Threshold   | Alert    |
+| --------------------- | ----------- | -------- |
+| CPU Usage             | > 80%       | Warning  |
+| Memory Usage          | > 90%       | Warning  |
+| Disk Usage            | > 85%       | Warning  |
+| Pod Restart Count     | > 3 (5 min) | Critical |
+| Request Latency (p99) | > 500ms     | Warning  |
+| Error Rate            | > 1%        | Critical |
+| Service Availability  | < 99.5%     | Critical |
 
 ### Query Metrics
 
@@ -134,12 +134,12 @@ open http://localhost:3000
 
 ### Important Dashboards
 
-| Dashboard | Purpose |
-|-----------|---------|
-| Cluster Overview | Node health, resource usage |
-| Deployment Status | Pod count, restarts, errors |
+| Dashboard           | Purpose                     |
+| ------------------- | --------------------------- |
+| Cluster Overview    | Node health, resource usage |
+| Deployment Status   | Pod count, restarts, errors |
 | Service Performance | Latency, throughput, errors |
-| Resource Usage | CPU, memory, disk trends |
+| Resource Usage      | CPU, memory, disk trends    |
 
 ---
 
@@ -184,13 +184,13 @@ groups:
         for: 5m
         annotations:
           summary: "Pod {{ $labels.pod }} has high CPU usage"
-      
+
       - alert: HighErrorRate
         expr: sum(rate(http_requests_total{status=~"5.."}[5m])) / sum(rate(http_requests_total[5m])) > 0.01
         for: 5m
         annotations:
           summary: "Error rate above 1%"
-      
+
       - alert: PodCrashLooping
         expr: increase(kube_pod_container_status_restarts_total[15m]) > 3
         annotations:
@@ -227,28 +227,31 @@ kubectl describe node NODE_NAME
 
 Based on alert:
 
-| Alert | Response | Runbook |
-|-------|----------|---------|
-| High CPU | Scale out or optimize code | [Scaling](SCALING.md) |
-| High Memory | Identify memory leak, restart pod | [Scaling](SCALING.md) |
-| High Error Rate | Check logs, rollback if needed | [Incident Playbook](#) |
-| Pod Crashing | Check logs, fix config | [Troubleshooting](../deployment/TROUBLESHOOTING.md) |
-| Node Down | Replace node (automatic) | [Disaster Recovery](DISASTER_RECOVERY.md) |
+| Alert           | Response                          | Runbook                                             |
+| --------------- | --------------------------------- | --------------------------------------------------- |
+| High CPU        | Scale out or optimize code        | [Scaling](SCALING.md)                               |
+| High Memory     | Identify memory leak, restart pod | [Scaling](SCALING.md)                               |
+| High Error Rate | Check logs, rollback if needed    | [Incident Playbook](#)                              |
+| Pod Crashing    | Check logs, fix config            | [Troubleshooting](../deployment/TROUBLESHOOTING.md) |
+| Node Down       | Replace node (automatic)          | [Disaster Recovery](DISASTER_RECOVERY.md)           |
 
 ---
 
 ## 📞 Escalation
 
 ### Level 1: Auto-Recovery
+
 - Kubernetes restarts failed pods
 - CloudWatch alarms trigger SNS
 
 ### Level 2: On-Call
+
 - Investigates alert
 - Takes corrective action
 - Documents incident
 
 ### Level 3: Escalation
+
 - Contact team lead
 - Critical alerts only (availability < 99%)
 

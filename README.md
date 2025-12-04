@@ -15,6 +15,7 @@ This version of eShop is based on .NET 9.
 ### Quick Start (5 minutes)
 
 **Local Development:**
+
 ```bash
 cd codebase
 dotnet restore
@@ -23,6 +24,7 @@ dotnet run --project src/eShop.AppHost
 ```
 
 **Infrastructure Deployment:**
+
 ```bash
 cd infra
 ./deploy-infrastructure.sh
@@ -31,16 +33,17 @@ cd infra
 
 ### 📖 Documentation
 
-| Resource | Purpose |
-|----------|---------|
-| [📚 Documentation Index](docs/INDEX.md) | Navigate docs by role |
-| [🚀 Getting Started](docs/GETTING_STARTED.md) | Setup & first steps |
-| [🏗️ Architecture](docs/ARCHITECTURE.md) | System design & components |
-| [🔧 Infrastructure](docs/infrastructure/README.md) | Cloud setup & Terraform |
-| [🚨 Runbooks](docs/runbooks/) | Operational procedures |
-| [🔄 CI/CD Workflows](docs/CI-CD.md) | Automated testing & deployment |
+| Resource                                           | Purpose                        |
+| -------------------------------------------------- | ------------------------------ |
+| [📚 Documentation Index](docs/INDEX.md)            | Navigate docs by role          |
+| [🚀 Getting Started](docs/GETTING_STARTED.md)      | Setup & first steps            |
+| [🏗️ Architecture](docs/ARCHITECTURE.md)            | System design & components     |
+| [🔧 Infrastructure](docs/infrastructure/README.md) | Cloud setup & Terraform        |
+| [🚨 Runbooks](docs/runbooks/)                      | Operational procedures         |
+| [🔄 CI/CD Workflows](docs/CI-CD.md)                | Automated testing & deployment |
 
 **Choose your path:**
+
 - **👨‍💻 Developers:** [Local Development Setup](docs/GETTING_STARTED.md#-i-want-to-develop-locally)
 - **🏗️ DevOps/SREs:** [Infrastructure Overview](docs/infrastructure/README.md)
 - **📊 Operators:** [Runbooks & Operations](docs/runbooks/)
@@ -48,7 +51,8 @@ cd infra
 ---
 
 Previous eShop versions:
-* [.NET 8](https://github.com/dotnet/eShop/tree/release/8.0)
+
+- [.NET 8](https://github.com/dotnet/eShop/tree/release/8.0)
 
 ### Prerequisites
 
@@ -56,6 +60,7 @@ Previous eShop versions:
 - [Install & start Docker Desktop](https://docs.docker.com/engine/install/)
 
 #### Windows with Visual Studio
+
 - Install [Visual Studio 2022 version 17.10 or newer](https://visualstudio.microsoft.com/vs/).
   - Select the following workloads:
     - `ASP.NET and web development` workload.
@@ -77,6 +82,7 @@ Or
 - From Dev Home go to `Machine Configuration -> Clone repositories`. Enter the URL for this repository. In the confirmation screen look for the section `Configuration File Detected` and click `Run File`.
 
 #### Mac, Linux, & Windows without Visual Studio
+
 - Install the latest [.NET 9 SDK](https://dot.net/download?cid=eshop)
 
 Or
@@ -84,6 +90,7 @@ Or
 - Run the following commands in a Powershell & Terminal running as `Administrator` to automatically configuration your environment with the required tools to build and run this application. (Note: A restart is required after running the script below.)
 
 ##### Install Visual Studio Code and related extensions
+
 ```powershell
 install-Module -Name Microsoft.WinGet.Configuration -AllowPrerelease -AcceptLicense  -Force
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
@@ -95,23 +102,27 @@ get-WinGetConfiguration -file .\.configurations\vscode.dsc.yaml | Invoke-WinGetC
 - Optional: Install [Visual Studio Code with C# Dev Kit](https://code.visualstudio.com/docs/csharp/get-started)
 - Optional: Install [.NET MAUI Workload](https://learn.microsoft.com/dotnet/maui/get-started/installation?tabs=visual-studio-code)
 
-> Note: When running on Mac with Apple Silicon (M series processor), Rosetta 2 for grpc-tools. 
+> Note: When running on Mac with Apple Silicon (M series processor), Rosetta 2 for grpc-tools.
 
 ### Running the solution
 
 > [!WARNING]
 > Remember to ensure that Docker is started
 
-* (Windows only) Run the application from Visual Studio:
- - Open the `eShop.Web.slnf` file in Visual Studio
- - Ensure that `eShop.AppHost.csproj` is your startup project
- - Hit Ctrl-F5 to launch Aspire
+- (Windows only) Run the application from Visual Studio:
 
-* Or run the application from your terminal:
+* Open the `eShop.Web.slnf` file in Visual Studio
+* Ensure that `eShop.AppHost.csproj` is your startup project
+* Hit Ctrl-F5 to launch Aspire
+
+- Or run the application from your terminal:
+
 ```powershell
 dotnet run --project codebase/src/eShop.AppHost/eShop.AppHost.csproj
 ```
+
 then look for lines like this in the console output in order to find the URL to open the Aspire dashboard:
+
 ```sh
 Login to the dashboard at: http://localhost:19888/login?t=uniquelogincodeforyou
 ```
@@ -120,7 +131,7 @@ Login to the dashboard at: http://localhost:19888/login?t=uniquelogincodeforyou
 
 ### Azure Open AI
 
-When using Azure OpenAI, inside *eShop.AppHost/appsettings.json*, add the following section:
+When using Azure OpenAI, inside _eShop.AppHost/appsettings.json_, add the following section:
 
 ```json
   "ConnectionStrings": {
@@ -128,13 +139,13 @@ When using Azure OpenAI, inside *eShop.AppHost/appsettings.json*, add the follow
   }
 ```
 
-Replace the values with your own. Then, in the eShop.AppHost *Program.cs*, set this value to **true**
+Replace the values with your own. Then, in the eShop.AppHost _Program.cs_, set this value to **true**
 
 ```csharp
 bool useOpenAI = false;
 ```
 
-Here's additional guidance on the [.NET Aspire OpenAI component](https://learn.microsoft.com/dotnet/aspire/azureai/azureai-openai-component?tabs=dotnet-cli). 
+Here's additional guidance on the [.NET Aspire OpenAI component](https://learn.microsoft.com/dotnet/aspire/azureai/azureai-openai-component?tabs=dotnet-cli).
 
 ### Use Azure Developer CLI
 
@@ -142,29 +153,37 @@ You can use the [Azure Developer CLI](https://aka.ms/azd) to run this project on
 
 - Install the latest or update to the latest [Azure Developer CLI (azd)](https://aka.ms/azure-dev/install).
 - Log in `azd` (if you haven't done it before) to your Azure account:
+
 ```sh
 azd auth login
 ```
+
 - Initialize `azd` from the root of the repo.
+
 ```sh
 azd init
 ```
+
 - During init:
+
   - Select `Use code in the current directory`. Azd will automatically detect the .NET Aspire project.
   - Confirm `.NET (Aspire)` and continue.
   - Select which services to expose to the Internet (exposing `webapp` is enough to test the sample).
   - Finalize the initialization by giving a name to your environment.
 
 - Create Azure resources and deploy the sample by running:
+
 ```sh
 azd up
 ```
+
 Notes:
-  - The operation takes a few minutes the first time it is ever run for an environment.
-  - At the end of the process, `azd` will display the `url` for the webapp. Follow that link to test the sample.
-  - You can run `azd up` after saving changes to the sample to re-deploy and update the sample.
-  - Report any issues to [azure-dev](https://github.com/Azure/azure-dev/issues) repo.
-  - [FAQ and troubleshoot](https://learn.microsoft.com/azure/developer/azure-developer-cli/troubleshoot?tabs=Browser) for azd.
+
+- The operation takes a few minutes the first time it is ever run for an environment.
+- At the end of the process, `azd` will display the `url` for the webapp. Follow that link to test the sample.
+- You can run `azd up` after saving changes to the sample to re-deploy and update the sample.
+- Report any issues to [azure-dev](https://github.com/Azure/azure-dev/issues) repo.
+- [FAQ and troubleshoot](https://learn.microsoft.com/azure/developer/azure-developer-cli/troubleshoot?tabs=Browser) for azd.
 
 ## Contributing
 

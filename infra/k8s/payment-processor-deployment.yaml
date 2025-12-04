@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-processor
+  namespace: eshop
+  labels:
+    app: payment-processor
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: payment-processor
+  template:
+    metadata:
+      labels:
+        app: payment-processor
+        version: v1
+    spec:
+      serviceAccountName: eshop-sa
+      containers:
+      - name: payment-processor
+        image: CONTAINER_REGISTRY/payment-processor:latest
+        imagePullPolicy: Always
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Production"
+        - name: RabbitMqSettings__Host
+          valueFrom:
+            secretKeyRef:
+              name: eshop-secrets
+              key: rabbitmq-host
+        - name: RabbitMqSettings__UserName
+          valueFrom:
+            secretKeyRef:
+              name: eshop-secrets
+              key: rabbitmq-username
+        - name: RabbitMqSettings__Password
+          valueFrom:
+            secretKeyRef:
+              name: eshop-secrets
+              key: rabbitmq-password
+        - name: STRIPE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: eshop-secrets
+              key: stripe-api-key
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+      securityContext:
+        fsGroup: 1000
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - payment-processor
+              topologyKey: kubernetes.io/hostname

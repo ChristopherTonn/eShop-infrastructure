@@ -19,41 +19,48 @@ var webhooksDb = postgres.AddDatabase("webhooksdb");
 
 var launchProfileName = ShouldUseHttpForEndpoints() ? "http" : "https";
 
-// Services
+// Services - with Aspire container support for Kubernetes deployment
 var identityApi = builder.AddProject<Projects.Identity_API>("identity-api", launchProfileName)
     .WithExternalHttpEndpoints()
-    .WithReference(identityDb);
+    .WithReference(identityDb)
+    .WithOci(); // Enable container image generation
 
 var identityEndpoint = identityApi.GetEndpoint(launchProfileName);
 
 var basketApi = builder.AddProject<Projects.Basket_API>("basket-api")
     .WithReference(redis)
     .WithReference(rabbitMq).WaitFor(rabbitMq)
-    .WithEnvironment("Identity__Url", identityEndpoint);
+    .WithEnvironment("Identity__Url", identityEndpoint)
+    .WithOci();
 redis.WithParentRelationship(basketApi);
 
 var catalogApi = builder.AddProject<Projects.Catalog_API>("catalog-api")
     .WithReference(rabbitMq).WaitFor(rabbitMq)
-    .WithReference(catalogDb);
+    .WithReference(catalogDb)
+    .WithOci();
 
 var orderingApi = builder.AddProject<Projects.Ordering_API>("ordering-api")
     .WithReference(rabbitMq).WaitFor(rabbitMq)
     .WithReference(orderDb).WaitFor(orderDb)
     .WithHttpHealthCheck("/health")
-    .WithEnvironment("Identity__Url", identityEndpoint);
+    .WithEnvironment("Identity__Url", identityEndpoint)
+    .WithOci();
 
 builder.AddProject<Projects.OrderProcessor>("order-processor")
     .WithReference(rabbitMq).WaitFor(rabbitMq)
     .WithReference(orderDb)
-    .WaitFor(orderingApi); // wait for the orderingApi to be ready because that contains the EF migrations
+    .WaitFor(orderingApi) // wait for the orderingApi to be ready because that contains the EF migrations
+    .WithOci();
 
 builder.AddProject<Projects.PaymentProcessor>("payment-processor")
-    .WithReference(rabbitMq).WaitFor(rabbitMq);
+    .WithReference(rabbitMq).WaitFor(rabbitMq)
+    .WithOci();
 
 var webHooksApi = builder.AddProject<Projects.Webhooks_API>("webhooks-api")
     .WithReference(rabbitMq).WaitFor(rabbitMq)
     .WithReference(webhooksDb)
-    .WithEnvironment("Identity__Url", identityEndpoint);
+    .WithEnvironment("Identity__Url", identityEndpoint)
+    .WithOci();
 
 // Reverse proxies
 builder.AddYarp("mobile-bff")
@@ -63,7 +70,8 @@ builder.AddYarp("mobile-bff")
 // Apps
 var webhooksClient = builder.AddProject<Projects.WebhookClient>("webhooksclient", launchProfileName)
     .WithReference(webHooksApi)
-    .WithEnvironment("IdentityUrl", identityEndpoint);
+    .WithEnvironment("IdentityUrl", identityEndpoint)
+    .WithOci();
 
 var webApp = builder.AddProject<Projects.WebApp>("webapp", launchProfileName)
     .WithExternalHttpEndpoints()
@@ -72,7 +80,8 @@ var webApp = builder.AddProject<Projects.WebApp>("webapp", launchProfileName)
     .WithReference(catalogApi)
     .WithReference(orderingApi)
     .WithReference(rabbitMq).WaitFor(rabbitMq)
-    .WithEnvironment("IdentityUrl", identityEndpoint);
+    .WithEnvironment("IdentityUrl", identityEndpoint)
+    .WithOci();
 
 // set to true if you want to use OpenAI
 bool useOpenAI = false;

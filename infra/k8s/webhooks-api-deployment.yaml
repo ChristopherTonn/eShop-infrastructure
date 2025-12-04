@@ -1,0 +1,119 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webhooks-api
+  namespace: eshop
+  labels:
+    app: webhooks-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: webhooks-api
+  template:
+    metadata:
+      labels:
+        app: webhooks-api
+        version: v1
+    spec:
+      serviceAccountName: eshop-sa
+      containers:
+      - name: webhooks-api
+        image: CONTAINER_REGISTRY/webhooks-api:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Production"
+        - name: ASPNETCORE_URLS
+          value: "http://+:8080"
+        - name: ConnectionStrings__webhooksdb
+          valueFrom:
+            secretKeyRef:
+              name: eshop-secrets
+              key: postgres-webhooks-connection
+        - name: ConnectionStrings__integrationeventlogdb
+          valueFrom:
+            secretKeyRef:
+              name: eshop-secrets
+              key: postgres-integrationeventlog-connection
+        - name: RabbitMqSettings__Host
+          valueFrom:
+            secretKeyRef:
+              name: eshop-secrets
+              key: rabbitmq-host
+        - name: RabbitMqSettings__UserName
+          valueFrom:
+            secretKeyRef:
+              name: eshop-secrets
+              key: rabbitmq-username
+        - name: RabbitMqSettings__Password
+          valueFrom:
+            secretKeyRef:
+              name: eshop-secrets
+              key: rabbitmq-password
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 2
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+      securityContext:
+        fsGroup: 1000
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - webhooks-api
+              topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: webhooks-api
+  namespace: eshop
+  labels:
+    app: webhooks-api
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  selector:
+    app: webhooks-api

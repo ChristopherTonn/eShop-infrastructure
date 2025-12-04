@@ -27,6 +27,7 @@ The ElastiCache module creates a managed Redis cache cluster for eShop, providin
 ### Input Variables
 
 See `variables.tf` for:
+
 - `cluster_id` - Cache cluster name
 - `engine_version` - Redis version (e.g., "7.0")
 - `node_type` - Instance size (e.g., cache.t3.micro)
@@ -38,6 +39,7 @@ See `variables.tf` for:
 ### Output Values
 
 See `outputs.tf` for:
+
 - `primary_endpoint` - Redis connection endpoint
 - `reader_endpoint` - For read-only connections
 - `port` - Redis port

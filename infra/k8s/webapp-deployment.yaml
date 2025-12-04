@@ -1,0 +1,119 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp
+  namespace: eshop
+  labels:
+    app: webapp
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: webapp
+  template:
+    metadata:
+      labels:
+        app: webapp
+        version: v1
+    spec:
+      serviceAccountName: eshop-sa
+      containers:
+      - name: webapp
+        image: CONTAINER_REGISTRY/webapp:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Production"
+        - name: ASPNETCORE_URLS
+          value: "http://+:8080"
+        - name: Identity__BaseUrl
+          valueFrom:
+            configMapKeyRef:
+              name: eshop-config
+              key: identity-base-url
+        - name: BasketApiClient__BaseUrl
+          valueFrom:
+            configMapKeyRef:
+              name: eshop-config
+              key: basket-api-url
+        - name: CatalogApiClient__BaseUrl
+          valueFrom:
+            configMapKeyRef:
+              name: eshop-config
+              key: catalog-api-url
+        - name: OrderingApiClient__BaseUrl
+          valueFrom:
+            configMapKeyRef:
+              name: eshop-config
+              key: ordering-api-url
+        - name: WebhooksApiClient__BaseUrl
+          valueFrom:
+            configMapKeyRef:
+              name: eshop-config
+              key: webhooks-api-url
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 2
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+      securityContext:
+        fsGroup: 1000
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - webapp
+              topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: webapp
+  namespace: eshop
+  labels:
+    app: webapp
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  selector:
+    app: webapp

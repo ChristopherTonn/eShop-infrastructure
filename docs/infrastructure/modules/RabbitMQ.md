@@ -28,6 +28,7 @@ The RabbitMQ module deploys RabbitMQ as a Kubernetes-based message broker for as
 ### Input Variables
 
 See `variables.tf` for:
+
 - `namespace` - Kubernetes namespace
 - `release_name` - Helm release name
 - `replicas` - Number of RabbitMQ nodes (for clustering)
@@ -39,6 +40,7 @@ See `variables.tf` for:
 ### Output Values
 
 See `outputs.tf` for:
+
 - `amqp_connection_string` - For service connections
 - `management_ui_url` - Web UI access
 - `service_name` - Kubernetes service endpoint

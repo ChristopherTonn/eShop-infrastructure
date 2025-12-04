@@ -27,6 +27,7 @@ The VPC module creates a complete networking foundation for eShop on AWS, includ
 ### Input Variables
 
 See `variables.tf` in module for:
+
 - `vpc_cidr` - VPC CIDR block
 - `public_subnet_cidrs` - Public subnet ranges
 - `private_subnet_cidrs` - Private subnet ranges
@@ -36,6 +37,7 @@ See `variables.tf` in module for:
 ### Output Values
 
 See `outputs.tf` for:
+
 - `vpc_id` - VPC identifier
 - `public_subnet_ids` - Public subnet IDs
 - `private_subnet_ids` - Private subnet IDs

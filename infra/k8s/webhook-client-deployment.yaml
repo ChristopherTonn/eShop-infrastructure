@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webhook-client
+  namespace: eshop
+  labels:
+    app: webhook-client
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: webhook-client
+  template:
+    metadata:
+      labels:
+        app: webhook-client
+        version: v1
+    spec:
+      serviceAccountName: eshop-sa
+      containers:
+      - name: webhook-client
+        image: CONTAINER_REGISTRY/webhook-client:latest
+        imagePullPolicy: Always
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Production"
+        - name: WebhooksUrl
+          valueFrom:
+            configMapKeyRef:
+              name: eshop-config
+              key: webhooks-api-url
+        - name: RabbitMqSettings__Host
+          valueFrom:
+            secretKeyRef:
+              name: eshop-secrets
+              key: rabbitmq-host
+        - name: RabbitMqSettings__UserName
+          valueFrom:
+            secretKeyRef:
+              name: eshop-secrets
+              key: rabbitmq-username
+        - name: RabbitMqSettings__Password
+          valueFrom:
+            secretKeyRef:
+              name: eshop-secrets
+              key: rabbitmq-password
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+      securityContext:
+        fsGroup: 1000

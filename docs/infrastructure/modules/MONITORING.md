@@ -28,6 +28,7 @@ The Monitoring module deploys Prometheus for metrics collection and Grafana for 
 ### Input Variables
 
 See `variables.tf` for:
+
 - `namespace` - Kubernetes namespace for monitoring stack
 - `prometheus_storage_size` - Prometheus persistence volume size
 - `grafana_admin_password` - Grafana initial password
@@ -38,6 +39,7 @@ See `variables.tf` for:
 ### Output Values
 
 See `outputs.tf` for:
+
 - `prometheus_endpoint` - Metrics API URL
 - `grafana_url` - Grafana web UI URL
 - `grafana_username` / `grafana_password` - Access credentials

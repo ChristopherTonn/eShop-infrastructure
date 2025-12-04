@@ -17,6 +17,7 @@ This document describes the overall architecture of the eShop Reference Applicat
 ### 📄 Reference Documents
 
 **PDF Documentation** (download these for offline reference):
+
 - 📋 [Technical Objective Paper](pdf/Technical%20Objective%20Paper.pdf) - Project goals, success criteria, implementation roadmap
 - 📊 [System Architecture Diagram](pdf/System%20Architecture%20Diagram.pdf) - Visual representation of all system components
 
@@ -31,7 +32,7 @@ eShop is a **polyglot microservices reference application** demonstrating:
 ✅ **.NET 9 & Aspire** - Latest .NET technologies  
 ✅ **Infrastructure-as-Code** - Terraform for reproducible deployments  
 ✅ **Observability** - Logging, monitoring, tracing via CloudWatch, Prometheus, Grafana  
-✅ **Security** - IAM roles, secrets management, network policies  
+✅ **Security** - IAM roles, secrets management, network policies
 
 ---
 
@@ -95,28 +96,28 @@ eShop is a **polyglot microservices reference application** demonstrating:
 
 ### 1. **Microservices**
 
-| Service | Port | Responsibility | Dependencies |
-|---------|------|-----------------|--------------|
-| **Catalog API** | 8001 | Product browsing, search | RDS, Redis |
-| **Basket API** | 8002 | Shopping cart operations | RabbitMQ, Redis |
-| **Ordering API** | 8003 | Order management | RDS, RabbitMQ |
-| **Identity API** | 8004 | Authentication, JWT tokens | RDS |
-| **Payment Processor** | N/A | Payment processing (background job) | RabbitMQ |
-| **Order Processor** | N/A | Order processing (background job) | RabbitMQ, RDS |
-| **Webhooks API** | 8005 | Event notifications | RabbitMQ |
-| **Web App** | 5173 | Frontend (React/ASP.NET) | All APIs |
+| Service               | Port | Responsibility                      | Dependencies    |
+| --------------------- | ---- | ----------------------------------- | --------------- |
+| **Catalog API**       | 8001 | Product browsing, search            | RDS, Redis      |
+| **Basket API**        | 8002 | Shopping cart operations            | RabbitMQ, Redis |
+| **Ordering API**      | 8003 | Order management                    | RDS, RabbitMQ   |
+| **Identity API**      | 8004 | Authentication, JWT tokens          | RDS             |
+| **Payment Processor** | N/A  | Payment processing (background job) | RabbitMQ        |
+| **Order Processor**   | N/A  | Order processing (background job)   | RabbitMQ, RDS   |
+| **Webhooks API**      | 8005 | Event notifications                 | RabbitMQ        |
+| **Web App**           | 5173 | Frontend (React/ASP.NET)            | All APIs        |
 
 ### 2. **Infrastructure Services**
 
-| Service | Purpose | Configuration |
-|---------|---------|----------------|
-| **RabbitMQ** | Event messaging bus | 3-node cluster in EKS |
-| **PostgreSQL (RDS)** | Primary database | Multi-AZ, automated backups |
-| **Redis (ElastiCache)** | Caching layer | Cluster mode enabled |
-| **Prometheus** | Metrics collection | Scrapes services every 15s |
-| **Grafana** | Monitoring dashboards | Pre-configured dashboards |
-| **Fluent Bit** | Log aggregation | Ships to CloudWatch |
-| **CloudWatch** | Centralized logging | Log groups per service |
+| Service                 | Purpose               | Configuration               |
+| ----------------------- | --------------------- | --------------------------- |
+| **RabbitMQ**            | Event messaging bus   | 3-node cluster in EKS       |
+| **PostgreSQL (RDS)**    | Primary database      | Multi-AZ, automated backups |
+| **Redis (ElastiCache)** | Caching layer         | Cluster mode enabled        |
+| **Prometheus**          | Metrics collection    | Scrapes services every 15s  |
+| **Grafana**             | Monitoring dashboards | Pre-configured dashboards   |
+| **Fluent Bit**          | Log aggregation       | Ships to CloudWatch         |
+| **CloudWatch**          | Centralized logging   | Log groups per service      |
 
 ### 3. **Network Components**
 
@@ -172,6 +173,7 @@ graph LR
 ## 🛠️ Technology Stack
 
 ### Backend
+
 - **.NET 9** - Latest LTS framework
 - **ASP.NET Core** - Web APIs
 - **Entity Framework Core** - ORM
@@ -179,11 +181,13 @@ graph LR
 - **AutoMapper** - DTO mapping
 
 ### Frontend
+
 - **React** - UI framework
 - **TypeScript** - Type safety
 - **Vite** - Build tooling
 
 ### Infrastructure
+
 - **AWS EKS** - Kubernetes orchestration
 - **AWS RDS** - Managed PostgreSQL
 - **AWS ElastiCache** - Redis caching
@@ -191,12 +195,14 @@ graph LR
 - **Helm** - Kubernetes package manager
 
 ### Observability
+
 - **Prometheus** - Metrics
 - **Grafana** - Dashboards
 - **CloudWatch** - Centralized logging
 - **Fluent Bit** - Log collection
 
 ### CI/CD
+
 - **GitHub Actions** - Automation
 - **Docker** - Containerization
 - **ECR** - Container registry
@@ -206,26 +212,32 @@ graph LR
 ## 🎯 Design Decisions
 
 ### 1. **Microservices Over Monolith**
+
 **Why?** Independent scaling, technology flexibility, team autonomy  
 **Trade-off:** Added complexity in distributed systems
 
 ### 2. **Event-Driven Communication**
+
 **Why?** Loose coupling, asynchronous processing, audit trail  
 **Implementation:** RabbitMQ with MassTransit
 
 ### 3. **PostgreSQL + Redis**
+
 **Why?** Relational data in Postgres, session/cache in Redis  
 **Performance:** Redis Cache-Aside pattern for catalog data
 
 ### 4. **Kubernetes on EKS**
+
 **Why?** Industry standard, managed service, auto-scaling  
 **Alternative considered:** ECS, but EKS provides better community support
 
 ### 5. **Terraform for IaC**
+
 **Why?** Multi-cloud capable, state management, reproducibility  
 **State:** Stored in S3 with DynamoDB locking
 
 ### 6. **CloudWatch + Prometheus + Grafana**
+
 **Why?** CloudWatch for native AWS integration, Prometheus for flexibility  
 **Benefit:** Dual visibility - AWS native + open-source
 
@@ -235,14 +247,14 @@ graph LR
 
 ### Horizontal Scaling
 
-| Component | Min | Recommended | Max |
-|-----------|-----|-------------|-----|
-| Catalog API pods | 2 | 3-5 | 10 |
-| Basket API pods | 2 | 2-3 | 8 |
-| Ordering API pods | 2 | 3-5 | 10 |
-| EKS nodes | 3 | 5-10 | 50+ |
-| RDS replicas | 0 | 1 (read replica) | 2 |
-| Redis shards | 1 | 3 | 6 |
+| Component         | Min | Recommended      | Max |
+| ----------------- | --- | ---------------- | --- |
+| Catalog API pods  | 2   | 3-5              | 10  |
+| Basket API pods   | 2   | 2-3              | 8   |
+| Ordering API pods | 2   | 3-5              | 10  |
+| EKS nodes         | 3   | 5-10             | 50+ |
+| RDS replicas      | 0   | 1 (read replica) | 2   |
+| Redis shards      | 1   | 3                | 6   |
 
 ### Caching Strategy
 
@@ -272,16 +284,19 @@ Request → ALB → Service
 ## 🔐 Security Architecture
 
 ### Network Security
+
 - **VPC isolation:** Services in private subnets
 - **Security groups:** Minimal ingress/egress rules
 - **OIDC:** GitHub Actions → AWS IAM (no long-lived credentials)
 
 ### Secrets Management
+
 - **AWS Secrets Manager:** Centralized secret storage
 - **Kubernetes CSI:** Secret injection into pods
 - **Environment variables:** For non-sensitive config
 
 ### Data Protection
+
 - **TLS 1.3:** All in-transit encryption
 - **RDS encryption:** At-rest encryption enabled
 - **Database backups:** Daily automated snapshots

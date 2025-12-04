@@ -26,6 +26,7 @@ The EKS module provisions a managed Kubernetes cluster on AWS with worker nodes,
 ### Input Variables
 
 See `variables.tf` for:
+
 - `cluster_name` - EKS cluster name
 - `cluster_version` - Kubernetes version (e.g., "1.29")
 - `vpc_id` - VPC for cluster
@@ -36,6 +37,7 @@ See `variables.tf` for:
 ### Output Values
 
 See `outputs.tf` for:
+
 - `cluster_id` - Cluster identifier
 - `cluster_endpoint` - Kubernetes API endpoint
 - `cluster_arn` - ARN for IAM policies

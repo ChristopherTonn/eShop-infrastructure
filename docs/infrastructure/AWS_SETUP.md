@@ -18,6 +18,7 @@ Prerequisites and initial setup for deploying eShop to AWS.
 ### Enable Services
 
 In AWS Console:
+
 - ✅ EC2 (Elastic Compute Cloud)
 - ✅ ECS (Elastic Container Service)
 - ✅ EKS (Elastic Kubernetes Service)
@@ -41,6 +42,7 @@ aws iam create-user --user-name eshop-deployment
 ```
 
 Or via AWS Console:
+
 1. Navigate to **IAM** → **Users**
 2. Click **Create user**
 3. Name: `eshop-deployment`
@@ -170,6 +172,7 @@ aws iam create-open-id-connect-provider \
 ```
 
 Or via Console:
+
 1. Navigate to **IAM** → **Identity Providers**
 2. Click **Create provider**
 3. Select **OpenID Connect**
@@ -221,17 +224,17 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write  # Required for OIDC
+      id-token: write # Required for OIDC
       contents: read
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::123456789012:role/github-actions-eshop
           aws-region: eu-central-1
-      
+
       - name: Deploy infrastructure
         run: |
           cd infra/terraform/envs/dev
@@ -283,14 +286,14 @@ ssh eshop-eks "docker --version"
 
 ### Development Environment (Typical Costs)
 
-| Resource | Instance | Monthly Cost |
-|----------|----------|--------------|
-| EKS Control Plane | — | $73.00 |
-| EKS Worker Nodes | 2x t3.medium | $58.32 |
-| RDS PostgreSQL | db.t3.micro | $37.44 |
-| ElastiCache Redis | cache.t3.micro | $45.44 |
-| NAT Gateway | 1x | $32.40 |
-| **Total** | — | **~$247/month** |
+| Resource          | Instance       | Monthly Cost    |
+| ----------------- | -------------- | --------------- |
+| EKS Control Plane | —              | $73.00          |
+| EKS Worker Nodes  | 2x t3.medium   | $58.32          |
+| RDS PostgreSQL    | db.t3.micro    | $37.44          |
+| ElastiCache Redis | cache.t3.micro | $45.44          |
+| NAT Gateway       | 1x             | $32.40          |
+| **Total**         | —              | **~$247/month** |
 
 ### Cost Optimization Tips
 

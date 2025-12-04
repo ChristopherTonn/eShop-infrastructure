@@ -18,13 +18,13 @@ Procedures for recovering from various disaster scenarios.
 
 ## 🎯 RTO/RPO Targets
 
-| Scenario | RTO | RPO | Impact |
-|----------|-----|-----|--------|
-| Single Pod Failure | 5 min | 0 min | Automatic (Kubernetes) |
-| Node Failure | 10 min | 0 min | Automatic (node replacement) |
-| RDS Failure | 15 min | < 1 min | Automatic failover |
-| Region Failure | 1 hour | < 1 hour | Manual failover to backup region |
-| Complete Outage | 4 hours | 24 hours | Full infrastructure rebuild |
+| Scenario           | RTO     | RPO      | Impact                           |
+| ------------------ | ------- | -------- | -------------------------------- |
+| Single Pod Failure | 5 min   | 0 min    | Automatic (Kubernetes)           |
+| Node Failure       | 10 min  | 0 min    | Automatic (node replacement)     |
+| RDS Failure        | 15 min  | < 1 min  | Automatic failover               |
+| Region Failure     | 1 hour  | < 1 hour | Manual failover to backup region |
+| Complete Outage    | 4 hours | 24 hours | Full infrastructure rebuild      |
 
 ---
 
@@ -35,12 +35,14 @@ Procedures for recovering from various disaster scenarios.
 **Trigger:** RDS Multi-AZ automatic failover (happens automatically)
 
 **Timeline:**
+
 - Detection: < 2 minutes
 - Failover: ~1-2 minutes
 - Application restart: ~5 minutes
 - Total RTO: ~10 minutes
 
 **Verification:**
+
 ```bash
 # Check database status
 aws rds describe-db-instances \
@@ -103,6 +105,7 @@ aws rds delete-db-instance \
 **Trigger:** Node becomes unreachable
 
 **Kubernetes auto-recovery:**
+
 ```bash
 # Monitor node status
 kubectl get nodes -w
@@ -114,6 +117,7 @@ kubectl get nodes -w
 ```
 
 **Manual verification:**
+
 ```bash
 # Check node status
 kubectl describe node <NODE_NAME>
@@ -216,7 +220,7 @@ kubectl logs -n eshop deployment/catalog-api | grep -i "corrupt\|invalid\|error"
 # Check database constraints
 psql -h RDS_ENDPOINT -U eshop -d catalogdb << EOF
   SELECT table_name FROM information_schema.tables WHERE table_schema='public';
-  
+
   -- Run constraint checks
   ALTER TABLE catalog VALIDATE CONSTRAINT fk_category;
 EOF
@@ -251,16 +255,19 @@ kubectl logs -f -n eshop deployment/catalog-api
 ## 📞 Escalation
 
 ### Level 1: Automated Response
+
 - Kubernetes auto-healing
 - RDS multi-AZ failover
 - CloudWatch alarms
 
 ### Level 2: Manual Intervention (15-30 min)
+
 - Contact: Platform Team
 - Actions: Node replacement, pod recovery
 - Tools: kubectl, AWS CLI
 
 ### Level 3: Disaster Recovery (1-4 hours)
+
 - Contact: Director of Engineering
 - Actions: Regional failover, data restore
 - Approval: Required for destructive operations

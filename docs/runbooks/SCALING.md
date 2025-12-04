@@ -20,14 +20,14 @@ Horizontal and vertical scaling strategies for eShop infrastructure.
 
 ### When to Scale
 
-| Metric | Threshold | Action |
-|--------|-----------|--------|
-| CPU Usage | 70-80% | Scale out pods |
-| Memory Usage | 80-90% | Scale out pods |
-| Request Latency (p99) | > 500ms | Scale out |
-| Node CPU | > 80% | Add nodes |
-| RDS CPU | > 80% | Upgrade instance type |
-| RDS Storage | > 80% | Expand volume |
+| Metric                | Threshold | Action                |
+| --------------------- | --------- | --------------------- |
+| CPU Usage             | 70-80%    | Scale out pods        |
+| Memory Usage          | 80-90%    | Scale out pods        |
+| Request Latency (p99) | > 500ms   | Scale out             |
+| Node CPU              | > 80%     | Add nodes             |
+| RDS CPU               | > 80%     | Upgrade instance type |
+| RDS Storage           | > 80%     | Expand volume         |
 
 ---
 
@@ -67,31 +67,31 @@ spec:
   minReplicas: 2
   maxReplicas: 10
   metrics:
-  - type: Resource
-    resource:
-      name: cpu
-      target:
-        type: Utilization
-        averageUtilization: 70
-  - type: Resource
-    resource:
-      name: memory
-      target:
-        type: Utilization
-        averageUtilization: 80
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
   behavior:
     scaleDown:
       stabilizationWindowSeconds: 300
       policies:
-      - type: Percent
-        value: 50
-        periodSeconds: 60
+        - type: Percent
+          value: 50
+          periodSeconds: 60
     scaleUp:
       stabilizationWindowSeconds: 0
       policies:
-      - type: Percent
-        value: 100
-        periodSeconds: 30
+        - type: Percent
+          value: 100
+          periodSeconds: 30
 ```
 
 ### Monitor HPA

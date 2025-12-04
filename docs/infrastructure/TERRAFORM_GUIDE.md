@@ -6,12 +6,12 @@ Deploy and manage eShop AWS infrastructure using Terraform.
 
 ## 📋 Prerequisites
 
-| Tool | Version | Check |
-|------|---------|-------|
-| **Terraform** | >= 1.5.0 | `terraform --version` |
-| **AWS CLI** | >= 2.0 | `aws --version` |
-| **kubectl** | >= 1.28 | `kubectl version --client` |
-| **Git** | >= 2.0 | `git --version` |
+| Tool          | Version  | Check                      |
+| ------------- | -------- | -------------------------- |
+| **Terraform** | >= 1.5.0 | `terraform --version`      |
+| **AWS CLI**   | >= 2.0   | `aws --version`            |
+| **kubectl**   | >= 1.28  | `kubectl version --client` |
+| **Git**       | >= 2.0   | `git --version`            |
 
 ---
 
@@ -179,6 +179,7 @@ terraform refresh
 ### VPC Module
 
 Creates a Virtual Private Cloud with:
+
 - 2 public subnets (for NAT Gateway, ALB)
 - 2 private subnets (for EKS nodes)
 - Internet Gateway
@@ -186,14 +187,15 @@ Creates a Virtual Private Cloud with:
 - Route tables
 
 **Usage:**
+
 ```hcl
 module "vpc" {
   source = "../modules/vpc"
-  
+
   vpc_cidr            = "10.0.0.0/16"
   public_subnet_cidrs  = ["10.0.1.0/24", "10.0.2.0/24"]
   private_subnet_cidrs = ["10.0.10.0/24", "10.0.11.0/24"]
-  
+
   tags = var.common_tags
 }
 ```
@@ -203,6 +205,7 @@ module "vpc" {
 ### EKS Module
 
 Creates a Kubernetes cluster with:
+
 - Control plane (AWS managed)
 - Worker node group
 - Security groups
@@ -210,22 +213,23 @@ Creates a Kubernetes cluster with:
 - Add-ons (VPC CNI, CoreDNS, kube-proxy)
 
 **Usage:**
+
 ```hcl
 module "eks" {
   source = "../modules/eks"
-  
+
   cluster_name    = "${var.project_name}-eks"
   cluster_version = var.eks_version
   vpc_id          = module.vpc.id
   subnet_ids      = module.vpc.private_subnet_ids
-  
+
   node_group_config = {
     desired_capacity = var.eks_desired_capacity
     min_capacity     = var.eks_min_capacity
     max_capacity     = var.eks_max_capacity
     instance_types   = var.eks_instance_types
   }
-  
+
   tags = var.common_tags
 }
 ```
@@ -235,27 +239,29 @@ module "eks" {
 ### RDS Module
 
 Creates a PostgreSQL database with:
+
 - Multi-AZ deployment (automatic failover)
 - Automated backups (7-day retention)
 - KMS encryption
 - Security group rules
 
 **Usage:**
+
 ```hcl
 module "rds" {
   source = "../modules/rds"
-  
+
   identifier       = "${var.project_name}-postgres"
   engine_version   = var.rds_engine_version
   instance_class   = var.rds_instance_class
   allocated_storage = var.rds_allocated_storage
   vpc_id           = module.vpc.id
   subnet_ids       = module.vpc.private_subnet_ids
-  
+
   database_name = "eshop"
   username      = "eshop"
   password      = random_password.db_password.result
-  
+
   tags = var.common_tags
 }
 ```
@@ -265,16 +271,18 @@ module "rds" {
 ### ElastiCache Module
 
 Creates a Redis cluster with:
+
 - Single or multi-node configuration
 - Automatic failover
 - Automated backups
 - Parameter groups for optimization
 
 **Usage:**
+
 ```hcl
 module "elasticache" {
   source = "../modules/elasticache"
-  
+
   cluster_id        = "${var.project_name}-redis"
   engine            = "redis"
   engine_version    = "7.0"
@@ -282,9 +290,9 @@ module "elasticache" {
   num_cache_nodes   = var.elasticache_num_nodes
   vpc_id            = module.vpc.id
   subnet_ids        = module.vpc.private_subnet_ids
-  
+
   auth_token = random_password.redis_password.result
-  
+
   tags = var.common_tags
 }
 ```

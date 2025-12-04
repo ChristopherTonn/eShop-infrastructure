@@ -26,6 +26,7 @@ The Logging module configures centralized logging for eShop on AWS CloudWatch, w
 ### Input Variables
 
 See `variables.tf` for:
+
 - `log_group_name` - CloudWatch log group name
 - `retention_in_days` - Log retention period (e.g., 7, 30)
 - `environment` - Environment name (dev, staging, prod)
@@ -35,6 +36,7 @@ See `variables.tf` for:
 ### Output Values
 
 See `outputs.tf` for:
+
 - `log_group_name` - CloudWatch log group identifier
 - `log_group_arn` - ARN for IAM policies
 - `fluent_bit_namespace` - Kubernetes namespace

@@ -6,18 +6,18 @@ Detailed procedures for common operational tasks and incident responses.
 
 ## 🚨 Incident & Disaster Recovery
 
-| Runbook | Purpose |
-|---------|---------|
-| [Disaster Recovery](DISASTER_RECOVERY.md) | Backup procedures, recovery processes, RTO/RPO targets |
-| [Monitoring & Alerting](MONITORING_ALERTS.md) | Health checks, alerting setup, incident detection |
+| Runbook                                       | Purpose                                                |
+| --------------------------------------------- | ------------------------------------------------------ |
+| [Disaster Recovery](DISASTER_RECOVERY.md)     | Backup procedures, recovery processes, RTO/RPO targets |
+| [Monitoring & Alerting](MONITORING_ALERTS.md) | Health checks, alerting setup, incident detection      |
 
 ---
 
 ## 📈 Capacity & Scaling
 
-| Runbook | Purpose |
-|---------|---------|
-| [Scaling Guide](SCALING.md) | Horizontal & vertical scaling, auto-scaling policies |
+| Runbook                           | Purpose                                                   |
+| --------------------------------- | --------------------------------------------------------- |
+| [Scaling Guide](SCALING.md)       | Horizontal & vertical scaling, auto-scaling policies      |
 | [Backups & Retention](BACKUPS.md) | Backup strategies, retention policies, restore procedures |
 
 ---
@@ -25,11 +25,13 @@ Detailed procedures for common operational tasks and incident responses.
 ## 🔧 How to Use These Runbooks
 
 1. **During Incident:**
+
    - Find relevant runbook below
    - Follow step-by-step procedures
    - Document actions taken
 
 2. **Before Incident:**
+
    - Read runbooks to understand procedures
    - Test recovery procedures quarterly
    - Validate backup/restore process

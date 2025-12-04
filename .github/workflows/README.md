@@ -95,9 +95,9 @@ Automatically builds and deploys container images to AWS EKS.
 ### Environment Variables
 
 ```yaml
-DOTNET_VERSION: "9.0.x"        # .NET SDK version (LTS)
+DOTNET_VERSION: "9.0.x" # .NET SDK version (LTS)
 DOTNET_CONFIGURATION: "Release" # Build configuration
-AWS_REGION: "eu-central-1"      # Target AWS region
+AWS_REGION: "eu-central-1" # Target AWS region
 ```
 
 ### Required Secrets (For CD Pipeline)
