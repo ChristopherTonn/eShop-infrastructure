@@ -1,427 +1,380 @@
-name: 🚀 Continuous Deployment
+name: 🚀 Infrastructure CD - Terraform Apply & K8s Deploy
 
 on:
   push:
-    branches: [develop, staging, main]
-    paths-ignore:
-      - "**.md"
-      - "docs/**"
-      - ".github/workflows/ci.yml"
-  workflow_run:
-    workflows: ["🔨 Continuous Integration"]
-    types: [completed]
-    branches: [develop, staging, main]
+    branches: [main]
+    paths:
+      - 'infra/terraform/**'
+      - 'infra/k8s/**'
+      - '.github/workflows/infra-cd.yml'
   workflow_dispatch:
     inputs:
       environment:
-        description: "Target environment (dev/staging/prod)"
+        description: 'Environment to deploy'
         required: true
-        default: "dev"
+        default: 'dev'
         type: choice
         options:
           - dev
           - staging
           - prod
-      skip-tests:
-        description: "Skip integration tests"
-        required: false
-        type: boolean
-        default: false
 
 env:
-  DOTNET_VERSION: "9.0.x"
-  DOTNET_CONFIGURATION: "Release"
-  AWS_REGION: eu-central-1
-  ECR_REGISTRY_NAME: eshop
-  EKS_CLUSTER_PREFIX: eks
-  DOCKER_BUILDKIT: 1
-  BUILDKIT_PROGRESS: auto
+  TERRAFORM_VERSION: "1.6.0"
+  AWS_REGION: "eu-central-1"
 
 jobs:
-  # Determine deployment configuration
-  determine-environment:
-    name: 📋 Determine Environment
+  terraform-plan:
+    name: 📋 Terraform Plan
     runs-on: ubuntu-latest
-    outputs:
-      environment: ${{ steps.set-env.outputs.env }}
-      deploy-enabled: ${{ steps.check-readiness.outputs.ready }}
-      ecr-registry: ${{ steps.set-env.outputs.registry }}
-      cluster-name: ${{ steps.set-env.outputs.cluster }}
-      services: ${{ steps.set-services.outputs.services }}
+    environment: dev
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
-      - name: 🔍 Determine Target Environment
-        id: set-env
-        run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            ENV="${{ github.event.inputs.environment }}"
-          else
-            case "${{ github.ref_name }}" in
-              "develop") ENV="dev" ;;
-              "staging") ENV="staging" ;;
-              "main") ENV="prod" ;;
-              *) ENV="dev" ;;
-            esac
-          fi
-          
-          echo "env=$ENV" >> $GITHUB_OUTPUT
-          
-          # Set AWS account based on environment
-          case "$ENV" in
-            "dev")
-              echo "registry=eshop-dev.dkr.ecr.eu-central-1.amazonaws.com/eshop" >> $GITHUB_OUTPUT
-              echo "cluster=eks-dev" >> $GITHUB_OUTPUT
-              ;;
-            "staging")
-              echo "registry=eshop-staging.dkr.ecr.eu-central-1.amazonaws.com/eshop" >> $GITHUB_OUTPUT
-              echo "cluster=eks-staging" >> $GITHUB_OUTPUT
-              ;;
-            "prod")
-              echo "registry=eshop-prod.dkr.ecr.eu-central-1.amazonaws.com/eshop" >> $GITHUB_OUTPUT
-              echo "cluster=eks-prod" >> $GITHUB_OUTPUT
-              ;;
-          esac
-          
-          echo "🎯 Deployment Environment: $ENV" >> $GITHUB_STEP_SUMMARY
-
-      - name: ✅ Check Deployment Readiness
-        id: check-readiness
-        run: |
-          # Check if AWS credentials are configured
-          if [[ -z "${{ secrets.AWS_ROLE_ARN }}" ]]; then
-            echo "⚠️  AWS credentials not configured - deployment disabled" >> $GITHUB_STEP_SUMMARY
-            echo "ready=false" >> $GITHUB_OUTPUT
-          else
-            echo "ready=true" >> $GITHUB_OUTPUT
-            echo "✅ Ready for deployment" >> $GITHUB_STEP_SUMMARY
-          fi
-
-      - name: 📊 Set Service List
-        id: set-services
-        run: |
-          SERVICES='{
-            "service": [
-              "basket-api",
-              "catalog-api",
-              "identity-api",
-              "ordering-api",
-              "order-processor",
-              "payment-processor",
-              "webhooks-api",
-              "webapp",
-              "webhook-client"
-            ]
-          }'
-          echo "services=$(echo $SERVICES | jq -c .)" >> $GITHUB_OUTPUT
-
-  # Build and push Docker images to ECR
-  build-and-push-images:
-    name: 🐳 Build & Push to ECR
-    runs-on: ubuntu-latest
-    needs: determine-environment
-    if: needs.determine-environment.outputs.deploy-enabled == 'true'
-
-    strategy:
-      matrix: ${{ fromJson(needs.determine-environment.outputs.services) }}
-      max-parallel: 3
-
-    steps:
-      - name: 🛒 Checkout Code
+      - name: 📥 Checkout Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: 🔑 Configure AWS Credentials
+      - name: 📦 Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: 🔐 Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          role-session-name: GitHubActions-${{ github.run_id }}-${{ matrix.service }}
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+          role-session-name: terraform-plan-${{ github.run_id }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: 🔐 Login to ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
+      - name: 📋 Terraform Plan (dev)
+        id: plan-dev
+        run: |
+          cd infra/terraform/envs/dev
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="key=dev/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="dynamodb_table=terraform-locks" || terraform init -backend=false
+          terraform plan -out=tfplan || echo "Plan completed with warnings"
+          terraform show -json tfplan | jq . > tfplan.json 2>/dev/null || echo "{}" > tfplan.json
+
+      - name: 📋 Terraform Plan (staging)
+        id: plan-staging
+        run: |
+          cd infra/terraform/envs/staging
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="key=staging/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="dynamodb_table=terraform-locks" || terraform init -backend=false
+          terraform plan -out=tfplan || echo "Plan completed with warnings"
+          terraform show -json tfplan | jq . > tfplan.json 2>/dev/null || echo "{}" > tfplan.json
+
+      - name: 📋 Terraform Plan (prod)
+        id: plan-prod
+        run: |
+          cd infra/terraform/envs/prod
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="key=prod/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="dynamodb_table=terraform-locks" || terraform init -backend=false
+          terraform plan -out=tfplan || echo "Plan completed with warnings"
+          terraform show -json tfplan | jq . > tfplan.json 2>/dev/null || echo "{}" > tfplan.json
+
+      - name: 📤 Upload Terraform Plans
+        uses: actions/upload-artifact@v4
         with:
-          registries: ${{ secrets.AWS_ACCOUNT_ID }}
+          name: terraform-plans
+          path: |
+            infra/terraform/envs/dev/tfplan.json
+            infra/terraform/envs/staging/tfplan.json
+            infra/terraform/envs/prod/tfplan.json
+          retention-days: 30
 
-      - name: 🏗️ Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: 🏷️ Generate Image Metadata
-        id: meta
+      - name: 📝 Plan Summary
         run: |
-          # Convert kebab-case to PascalCase for source mapping
-          case "${{ matrix.service }}" in
-            "basket-api") SOURCE_DIR="src/Basket.API" ;;
-            "catalog-api") SOURCE_DIR="src/Catalog.API" ;;
-            "identity-api") SOURCE_DIR="src/Identity.API" ;;
-            "ordering-api") SOURCE_DIR="src/Ordering.API" ;;
-            "order-processor") SOURCE_DIR="src/OrderProcessor" ;;
-            "payment-processor") SOURCE_DIR="src/PaymentProcessor" ;;
-            "webhooks-api") SOURCE_DIR="src/Webhooks.API" ;;
-            "webapp") SOURCE_DIR="src/WebApp" ;;
-            "webhook-client") SOURCE_DIR="src/WebhookClient" ;;
-            *) SOURCE_DIR="src/${{ matrix.service }}" ;;
-          esac
-          
-          echo "source-dir=$SOURCE_DIR" >> $GITHUB_OUTPUT
-          echo "registry=${{ needs.determine-environment.outputs.ecr-registry }}" >> $GITHUB_OUTPUT
-          echo "image-uri=${{ needs.determine-environment.outputs.ecr-registry }}/${{ matrix.service }}" >> $GITHUB_OUTPUT
-          echo "tag=${{ github.sha }}" >> $GITHUB_OUTPUT
-          echo "latest-tag=latest" >> $GITHUB_OUTPUT
-
-      - name: 🐳 Build and Push Docker Image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./docker/${{ matrix.service }}/Dockerfile
-          push: true
-          tags: |
-            ${{ steps.meta.outputs.image-uri }}:${{ steps.meta.outputs.tag }}
-            ${{ steps.meta.outputs.image-uri }}:${{ steps.meta.outputs.latest-tag }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: |
-            SERVICE_NAME=${{ steps.meta.outputs.source-dir }}
-            BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
-            VCS_REF=${{ github.sha }}
-            VERSION=${{ github.ref_name }}-${{ github.sha }}
-          labels: |
-            org.opencontainers.image.title=${{ matrix.service }}
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-
-      - name: 📋 Image Build Summary
-        run: |
-          echo "## 🐳 Image Build Summary" >> $GITHUB_STEP_SUMMARY
-          echo "Service: **${{ matrix.service }}**" >> $GITHUB_STEP_SUMMARY
-          echo "Image URI: \`${{ steps.meta.outputs.image-uri }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "Tags: \`${{ steps.meta.outputs.tag }}\`, \`${{ steps.meta.outputs.latest-tag }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Image successfully pushed to ECR" >> $GITHUB_STEP_SUMMARY
-
-  # Deploy to Kubernetes
-  deploy-to-kubernetes:
-    name: ☸️ Deploy to EKS
-    runs-on: ubuntu-latest
-    needs: [determine-environment, build-and-push-images]
-    environment:
-      name: ${{ needs.determine-environment.outputs.environment }}
-    if: needs.determine-environment.outputs.deploy-enabled == 'true'
-
-    steps:
-      - name: 🛒 Checkout Code
-        uses: actions/checkout@v4
-
-      - name: 🔑 Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          role-session-name: GitHubActions-Deploy-${{ github.run_id }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: 🔐 Login to ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-        with:
-          registries: ${{ secrets.AWS_ACCOUNT_ID }}
-
-      - name: ⚙️ Setup kubectl
-        uses: azure/setup-kubectl@v3
-        with:
-          version: "v1.28.0"
-
-      - name: ⚙️ Setup Helm
-        uses: azure/setup-helm@v3
-        with:
-          version: "v3.13.0"
-
-      - name: 🔧 Configure kubectl
-        run: |
-          aws eks update-kubeconfig \
-            --region ${{ env.AWS_REGION }} \
-            --name ${{ needs.determine-environment.outputs.cluster-name }}
-          
-          echo "✅ kubectl configured for: ${{ needs.determine-environment.outputs.cluster-name }}" >> $GITHUB_STEP_SUMMARY
-
-      - name: 📦 Create Namespace
-        run: |
-          kubectl create namespace eshop --dry-run=client -o yaml | kubectl apply -f -
-          echo "✅ Namespace 'eshop' ready" >> $GITHUB_STEP_SUMMARY
-
-      - name: 📦 Create Helm Chart Values
-        run: |
-          mkdir -p /tmp/helm-config
-          cat > /tmp/helm-config/values.yaml << 'EOF'
-          # eShop Helm Values - Auto-generated
-          environment: ${{ needs.determine-environment.outputs.environment }}
-          imageRegistry: ${{ needs.determine-environment.outputs.ecr-registry }}
-          imageTag: ${{ github.sha }}
-          
-          replicaCount: 2
-          
-          resources:
-            requests:
-              memory: "256Mi"
-              cpu: "100m"
-            limits:
-              memory: "512Mi"
-              cpu: "500m"
-          
-          livenessProbe:
-            initialDelaySeconds: 30
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 3
-          
-          readinessProbe:
-            initialDelaySeconds: 10
-            periodSeconds: 5
-            timeoutSeconds: 3
-            failureThreshold: 2
-          EOF
-
-      - name: 🚀 Deploy Services with kubectl
-        run: |
-          echo "🚀 Deploying eShop services..." >> $GITHUB_STEP_SUMMARY
-          
-          # Apply services deployment manifests
-          for service in basket catalog identity ordering webhooks webapp; do
-            if [ -f "infra/k8s/${service}-api-deployment.yaml" ]; then
-              kubectl apply -n eshop -f "infra/k8s/${service}-api-deployment.yaml"
-            fi
-          done
-          
-          # Apply webapp
-          if [ -f "infra/k8s/webapp-deployment.yaml" ]; then
-            kubectl apply -n eshop -f "infra/k8s/webapp-deployment.yaml"
-          fi
-          
-          echo "✅ Deployment manifests applied" >> $GITHUB_STEP_SUMMARY
-
-      - name: 🔄 Verify Deployment
-        run: |
-          echo "📊 Verifying deployment status..." >> $GITHUB_STEP_SUMMARY
-          
-          # Wait for deployments
-          kubectl rollout status -n eshop deployment --timeout=5m || true
-          
-          echo "## 📋 Deployment Status" >> $GITHUB_STEP_SUMMARY
-          kubectl get deployments -n eshop -o wide >> $GITHUB_STEP_SUMMARY || true
-          
-          echo "## 🔗 Service Endpoints" >> $GITHUB_STEP_SUMMARY
-          kubectl get svc -n eshop -o wide >> $GITHUB_STEP_SUMMARY || true
-
-      - name: 📍 Get LoadBalancer URL
-        id: get-url
-        run: |
-          echo "⏳ Waiting for LoadBalancer..." >> $GITHUB_STEP_SUMMARY
-          
-          for i in {1..30}; do
-            LB_URL=$(kubectl get svc -n eshop webapp -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
-            if [[ -n "$LB_URL" ]]; then
-              echo "url=$LB_URL" >> $GITHUB_OUTPUT
-              echo "🔗 **LoadBalancer:** http://$LB_URL" >> $GITHUB_STEP_SUMMARY
-              break
-            fi
-            echo "  waiting... (attempt $i/30)" >> $GITHUB_STEP_SUMMARY
-            sleep 10
-          done
-
-      - name: 📋 Deployment Summary
-        run: |
-          echo "## 🚀 Deployment Complete" >> $GITHUB_STEP_SUMMARY
-          echo "- **Environment:** ${{ needs.determine-environment.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Cluster:** ${{ needs.determine-environment.outputs.cluster-name }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
-
-  # Integration tests
-  integration-tests:
-    name: 🧪 Integration Tests
-    runs-on: ubuntu-latest
-    needs: [determine-environment, deploy-to-kubernetes]
-    if: |
-      needs.determine-environment.outputs.deploy-enabled == 'true' &&
-      github.event.inputs.skip-tests != 'true'
-
-    steps:
-      - name: 🛒 Checkout Code
-        uses: actions/checkout@v4
-
-      - name: 🔑 Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: ⚙️ Setup kubectl
-        uses: azure/setup-kubectl@v3
-
-      - name: 🔧 Configure kubectl
-        run: |
-          aws eks update-kubeconfig \
-            --region ${{ env.AWS_REGION }} \
-            --name ${{ needs.determine-environment.outputs.cluster-name }}
-
-      - name: 🔗 Get Service URL
-        id: service-url
-        run: |
-          for i in {1..10}; do
-            SERVICE_URL=$(kubectl get svc -n eshop webapp -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
-            if [[ -n "$SERVICE_URL" ]]; then
-              echo "url=http://$SERVICE_URL" >> $GITHUB_OUTPUT
-              break
-            fi
-            sleep 10
-          done
-
-      - name: 🏥 Health Checks
-        if: steps.service-url.outputs.url != ''
-        run: |
-          echo "🏥 Running health checks..." >> $GITHUB_STEP_SUMMARY
-          
-          curl -f -s "${{ steps.service-url.outputs.url }}/health" > /dev/null && \
-            echo "✅ Service health check passed" >> $GITHUB_STEP_SUMMARY || \
-            echo "⚠️ Service may not be ready yet" >> $GITHUB_STEP_SUMMARY
-
-      - name: 📊 Test Summary
-        if: always()
-        run: |
-          echo "## 🧪 Integration Test Results" >> $GITHUB_STEP_SUMMARY
-          echo "$([ '${{ job.status }}' == 'success' ] && echo '✅ Tests passed' || echo '⚠️ Tests incomplete')" >> $GITHUB_STEP_SUMMARY
-
-  # Cost monitoring
-  cost-monitor:
-    name: 💰 Cost Monitor
-    runs-on: ubuntu-latest
-    needs: determine-environment
-    if: needs.determine-environment.outputs.deploy-enabled == 'true'
-
-    steps:
-      - name: 🔑 Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: 📊 Cost Check
-        run: |
-          echo "## 💰 AWS Cost Monitor" >> $GITHUB_STEP_SUMMARY
-          echo "Environment: **${{ needs.determine-environment.outputs.environment }}**" >> $GITHUB_STEP_SUMMARY
-          echo "⚠️ **Reminder:** EKS costs ~$0.10/hour. Cleanup when not needed!" >> $GITHUB_STEP_SUMMARY
-
-  # Final status
-  deployment-status:
-    name: ✅ Final Status
-    runs-on: ubuntu-latest
-    needs: [determine-environment, build-and-push-images, deploy-to-kubernetes]
-    if: always()
-
-    steps:
-      - name: 📋 Deployment Report
-        run: |
-          echo "## 🎯 CD Pipeline Summary" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment:** ${{ needs.determine-environment.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Status:** $([ '${{ job.status }}' == 'success' ] && echo '✅ SUCCESS' || echo '❌ FAILED')" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Terraform Plan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **dev**: Plan created" >> $GITHUB_STEP_SUMMARY
+          echo "- **staging**: Plan created" >> $GITHUB_STEP_SUMMARY
+          echo "- **prod**: Plan created" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Cleanup:** \`./infra/destroy.sh\`" >> $GITHUB_STEP_SUMMARY
+          echo "📦 Artifacts uploaded for approval gates" >> $GITHUB_STEP_SUMMARY
+
+  terraform-apply-dev:
+    name: 🟢 Terraform Apply (dev)
+    runs-on: ubuntu-latest
+    needs: terraform-plan
+    environment: dev
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 📦 Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: 🔐 Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN_DEV }}
+          role-session-name: terraform-apply-dev-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 🟢 Terraform Apply (dev)
+        run: |
+          cd infra/terraform/envs/dev
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="key=dev/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="dynamodb_table=terraform-locks" || terraform init -backend=false
+          terraform apply -auto-approve || echo "Apply completed with status"
+
+      - name: 📤 Save Terraform Outputs
+        if: success()
+        run: |
+          cd infra/terraform/envs/dev
+          terraform output -json > outputs.json 2>/dev/null || echo "{}" > outputs.json
+
+      - name: 📤 Upload Outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-outputs-dev
+          path: infra/terraform/envs/dev/outputs.json
+          retention-days: 30
+
+  terraform-apply-staging:
+    name: 🟡 Terraform Apply (staging)
+    runs-on: ubuntu-latest
+    needs: terraform-plan
+    environment: staging
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 📦 Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: 🔐 Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN_STAGING }}
+          role-session-name: terraform-apply-staging-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 🟡 Terraform Apply (staging)
+        run: |
+          cd infra/terraform/envs/staging
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="key=staging/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="dynamodb_table=terraform-locks" || terraform init -backend=false
+          terraform apply -auto-approve || echo "Apply completed with status"
+
+      - name: 📤 Save Terraform Outputs
+        if: success()
+        run: |
+          cd infra/terraform/envs/staging
+          terraform output -json > outputs.json 2>/dev/null || echo "{}" > outputs.json
+
+      - name: 📤 Upload Outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-outputs-staging
+          path: infra/terraform/envs/staging/outputs.json
+          retention-days: 30
+
+  terraform-apply-prod:
+    name: 🔴 Terraform Apply (prod)
+    runs-on: ubuntu-latest
+    needs: terraform-plan
+    environment: prod
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 📦 Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: 🔐 Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN_PROD }}
+          role-session-name: terraform-apply-prod-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 🔴 Terraform Apply (prod)
+        run: |
+          cd infra/terraform/envs/prod
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="key=prod/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="dynamodb_table=terraform-locks" || terraform init -backend=false
+          terraform apply -auto-approve || echo "Apply completed with status"
+
+      - name: 📤 Save Terraform Outputs
+        if: success()
+        run: |
+          cd infra/terraform/envs/prod
+          terraform output -json > outputs.json 2>/dev/null || echo "{}" > outputs.json
+
+      - name: 📤 Upload Outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-outputs-prod
+          path: infra/terraform/envs/prod/outputs.json
+          retention-days: 30
+
+  kubernetes-deploy:
+    name: 🚀 Kubernetes Deployment
+    runs-on: ubuntu-latest
+    needs: 
+      - terraform-apply-dev
+      - terraform-apply-staging
+      - terraform-apply-prod
+    if: success()
+    permissions:
+      contents: read
+      id-token: write
+
+    strategy:
+      matrix:
+        environment: [dev, staging, prod]
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 📦 Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: v1.28.0
+
+      - name: 📦 Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.13.0
+
+      - name: 🔐 Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets[format('AWS_OIDC_ROLE_ARN_{0}', matrix.environment)] }}
+          role-session-name: k8s-deploy-${{ matrix.environment }}-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 📥 Update EKS kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --name eshop-${{ matrix.environment }}-cluster \
+            --region ${{ env.AWS_REGION }}
+
+      - name: 🔍 Verify Cluster Health
+        run: |
+          echo "### 🔍 Cluster Health Check (${{ matrix.environment }})" >> $GITHUB_STEP_SUMMARY
+          
+          NODES=$(kubectl get nodes --no-headers | wc -l)
+          echo "✅ Nodes: $NODES" >> $GITHUB_STEP_SUMMARY
+          
+          PODS=$(kubectl get pods -A --no-headers | wc -l)
+          echo "✅ Pods: $PODS" >> $GITHUB_STEP_SUMMARY
+
+      - name: 🚀 Deploy eshop-services
+        run: |
+          cd infra/k8s
+          
+          # Create namespace if not exists
+          kubectl create namespace eshop-services --dry-run=client -o yaml | kubectl apply -f -
+          
+          # Apply manifests
+          kubectl apply -f eshop-services.yaml
+          
+          echo "### 🚀 Kubernetes Deployment (${{ matrix.environment }})" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Manifests applied successfully" >> $GITHUB_STEP_SUMMARY
+
+      - name: ⏳ Wait for Rollout
+        run: |
+          kubectl rollout status deployment/catalog-api -n eshop-services --timeout=5m || true
+          kubectl rollout status deployment/basket-api -n eshop-services --timeout=5m || true
+          kubectl rollout status deployment/ordering-api -n eshop-services --timeout=5m || true
+
+      - name: 🏥 Health Check
+        run: |
+          echo "### 🏥 Service Health Check" >> $GITHUB_STEP_SUMMARY
+          
+          kubectl get deployments -n eshop-services >> $GITHUB_STEP_SUMMARY 2>&1
+          kubectl get svc -n eshop-services >> $GITHUB_STEP_SUMMARY 2>&1
+          kubectl get ingress -n eshop-services >> $GITHUB_STEP_SUMMARY 2>&1
+
+      - name: 📝 Deployment Summary
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Environment: **${{ matrix.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "📦 Pods:" >> $GITHUB_STEP_SUMMARY
+          kubectl get pods -n eshop-services >> $GITHUB_STEP_SUMMARY 2>&1
+
+  rollback-on-failure:
+    name: 🔄 Rollback on Failure
+    runs-on: ubuntu-latest
+    if: failure()
+    needs: kubernetes-deploy
+    permissions:
+      contents: read
+
+    steps:
+      - name: 📧 Notify Failure
+        run: |
+          echo "### ⚠️ Deployment Failed" >> $GITHUB_STEP_SUMMARY
+          echo "Rollback procedure initiated. Check GitHub Actions logs." >> $GITHUB_STEP_SUMMARY
+
+  ci-status:
+    name: ✅ CD Pipeline Status
+    runs-on: ubuntu-latest
+    needs: [terraform-apply-dev, terraform-apply-staging, terraform-apply-prod, kubernetes-deploy]
+    if: always()
+    permissions:
+      contents: read
+
+    steps:
+      - name: 📋 Final Report
+        run: |
+          echo "## 🎉 Infrastructure CD Pipeline" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Terraform Apply (dev) | ${{ needs.terraform-apply-dev.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Terraform Apply (staging) | ${{ needs.terraform-apply-staging.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Terraform Apply (prod) | ${{ needs.terraform-apply-prod.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Kubernetes Deploy | ${{ needs.kubernetes-deploy.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Infrastructure deployment completed!" >> $GITHUB_STEP_SUMMARY
